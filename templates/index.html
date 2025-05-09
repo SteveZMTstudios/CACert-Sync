@@ -1,0 +1,320 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+  <title>可信CA证书库</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style type="text/css">
+    body { 
+      font-family: Tahoma, Arial, Helvetica, sans-serif; 
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+      color: #000000;
+      font-size: 12px;
+    }
+    h1 { 
+      color: #0046ad; 
+      font-size: 18px;
+      margin-top: 0;
+      padding-bottom: 5px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-left: 10px;
+    }
+    h2 { 
+      color: #0046ad; 
+      font-size: 16px;
+      margin-top: 15px;
+    }
+    table { 
+      border-collapse: collapse; 
+      width: 100%; 
+      margin-top: 10px;
+      border: 1px solid #a1b0d6;
+    }
+    th, td { 
+      border: 1px solid #a1b0d6; 
+      text-align: left; 
+      padding: 6px; 
+    }
+    th { 
+      background: url('templates/assets/header-bg.gif') repeat-x #d8e1f5; 
+      color: #0046ad;
+      font-weight: bold;
+    }
+    tr:nth-child(even) { 
+      background-color: #eef2fb; 
+    }
+    tr:nth-child(odd) { 
+      background-color: #ffffff; 
+    }
+    a { 
+      color: #0066cc; 
+      text-decoration: none; 
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    a:visited { 
+      color: #6633cc; 
+    }
+    a img {
+      border: none;
+      vertical-align: middle;
+    }
+    .info { 
+      margin: 10px 0; 
+      font-style: italic;
+      color: #666666;
+      border: 1px solid #cccccc;
+      background-color: #f9f9f9;
+      padding: 6px 10px;
+      position: relative;
+      padding-left: 40px; /* 为图标腾出空间 */
+    }
+    .info img {
+      position: absolute;
+      left: 6px;
+      top: 50%;
+      margin-top: -12px; /* 垂直居中 */
+    }
+    .container {
+      width: 95%;
+      max-width: 800px;
+      margin: 10px auto;
+      border: 1px solid #a1b0d6;
+      background-color: #ffffff;
+      padding: 0;
+    }
+    .header {
+      background: url('templates/assets/header-bg.gif') repeat-x #d8e1f5;
+      padding: 10px;
+      border-bottom: 1px solid #a1b0d6;
+    }
+    .content {
+      padding: 10px;
+    }
+    .footer {
+      margin-top: 20px;
+      padding: 10px;
+      border-top: 1px solid #a1b0d6;
+      font-size: 11px;
+      color: #666666;
+      text-align: center;
+      background-color: #f5f8ff;
+    }
+    .search-container {
+      margin: 10px 0;
+      padding: 8px;
+      background-color: #eef2fb;
+      border: 1px solid #c0d0ee;
+      position: relative;
+    }
+    .search-input {
+      width: 60%;
+      padding: 4px;
+      border: 1px solid #a1b0d6;
+      vertical-align: middle;
+    }
+    .search-button {
+      vertical-align: middle;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+    }    .title-line {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .title-text {
+      flex: 1;
+    }
+    .title-text h1 {
+      margin: 0;
+      padding: 0;
+      line-height: 1.2;
+    }
+    .title-description {
+      color: #666666;
+      font-size: 12px;
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+    .title-icon {
+      margin-right: 5px;
+      flex-shrink: 0;
+    }
+    @media (max-width: 600px) {
+      body {
+        margin: 0;
+      }
+      .container {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        border: none;
+      }
+      table, td, th {
+        font-size: 11px;
+      }
+      .search-input {
+        width: 70%;
+      }
+      .info img {
+        width: 24px;
+        height: 24px;
+      }
+      .info {
+        padding-left: 34px;
+      }
+      .search-button img {
+        width: 24px;
+        height: 24px;
+      }      .download-button {
+        padding: 4px 6px;
+        font-size: 20px;
+      }      .title-line {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .title-description {
+        font-size: 11px;
+        text-align: center;
+      }
+    }
+    /* 为旧浏览器提供基本样式兼容 */
+    .rounded {
+      /* 非圆角浏览器将忽略这些属性 */
+      border-radius: 5px;
+      -moz-border-radius: 5px;
+      -webkit-border-radius: 5px;
+    }
+    /* 下载按钮样式 */
+    .download-button {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 3px 7px;
+      cursor: pointer;
+      background-color: #f5f5f5;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      text-align: center;
+    }
+    .download-button:hover {
+      background-color: #e6e6e6;
+      border-color: #adadad;
+    }
+    .download-button img {
+      vertical-align: middle;
+    }
+    /* 移除链接样式 */
+    .download-link {
+      text-decoration: none;
+      color: inherit;
+      display: inline-block;
+    }
+    .download-link:hover, .download-link:visited, .download-link:active {
+      text-decoration: none;
+      color: inherit;
+    }
+  </style>
+  
+  <!-- 基本的搜索功能，设计为优雅降级 -->
+  <script type="text/javascript">
+  <!--
+  function searchTable() {
+    try {
+      var input, filter, table, tr, td, i, txtValue;
+      input = document.getElementById("searchInput");
+      filter = input.value.toUpperCase();
+      table = document.getElementById("certTable");
+      tr = table.getElementsByTagName("tr");
+      
+      for (i = 1; i < tr.length; i++) {
+        var found = false;
+        for (var j = 0; j < tr[i].cells.length; j++) {
+          td = tr[i].cells[j];
+          if (td) {
+            txtValue = td.textContent || td.innerText;
+            if (txtValue.toUpperCase().indexOf(filter) > -1) {
+              found = true;
+              break;
+            }
+          }
+        }
+        if (found) {
+          tr[i].style.display = "";
+        } else {
+          tr[i].style.display = "none";
+        }
+      }
+    } catch(e) {
+      // 如果发生错误，确保所有行都可见
+      try {
+        var table = document.getElementById("certTable");
+        var rows = table.getElementsByTagName("tr");
+        for (var i = 0; i < rows.length; i++) {
+          rows[i].style.display = "";
+        }
+      } catch(e2) {
+        // 忽略进一步的错误
+      }
+    }
+  }
+  //-->
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header rounded">      <div class="title-line">
+        <img src="templates/assets/certificate.png" alt="证书" class="title-icon" width="64" height="64">
+        <div class="title-text">
+          <h1>可信CA证书库</h1>
+          <div class="title-description">此处收集来自 Firefox 和 Windows Update 的根证书颁发机构的CA证书，用于更新部分旧式浏览器和系统内置证书库。<br>证书库每年从多个上游刷新，请在<a href="https://github.com/stevezmtstudios/CACert-Sync" target="_blank">GitHub 仓库</a>上给我们星标。</div>
+        </div>
+      </div>
+      
+      <div class="info rounded">
+        <img src="templates/assets/timedate@32x32.png" alt="info" width="24" height="24">
+        最后更新日期: {{LAST_UPDATED}}<br>
+        当前包含 {{CERTIFICATE_COUNT}} 个证书
+      </div>
+    </div>
+    
+    <div class="content">
+      <h2>可下载的证书列表</h2>
+      <p>点击下载图标可直接下载单个证书文件（.crt格式）</p>
+      
+      <div class="search-container rounded">
+        <input type="text" id="searchInput" class="search-input rounded" placeholder="输入搜索内容..." onkeyup="searchTable()">
+        <button type="button" class="search-button" onclick="searchTable()">
+          <img src="templates/assets/search@32x32.png" alt="搜索" width="24" height="24">
+        </button>
+      </div>
+      
+      <table id="certTable" class="rounded">
+        <tr>
+          <th>颁发者</th>
+          <th>有效期至</th>
+          <th>下载</th>
+        </tr>
+        {{CERTIFICATE_LIST_REPLACED}}
+      </table>
+    </div>
+    
+    <div class="footer rounded">
+
+      该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br>
+      导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br>
+      页面设计版权所有 &copy; 2025 SteveZMT
+    </div>
+  </div>
+</body>
+</html>

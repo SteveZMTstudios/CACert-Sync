@@ -1,0 +1,77 @@
+name: CA Certificate Sync
+
+on:
+  schedule:
+    # 每年6月15日下午4:04运行
+    # I AM THE STORM THAT IS APPROACHING
+    - cron: '4 16 15 6 *'
+  workflow_dispatch: 
+
+jobs:
+  sync-certificates:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v3
+      
+      - name: 设置Python环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install certifi requests
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates libnss3-tools openssl cabextract wget
+      
+      - name: 同步证书
+        run: |
+          sudo python scripts/sync_certificates.py --clean
+          
+          # 获取证书数量
+          CERT_COUNT=$(find certs -name "*.crt" | wc -l)
+          echo "收集到 $CERT_COUNT 个证书"
+          
+          # 修复权限
+          sudo chmod -R 755 certs
+          sudo chmod 644 certs/*.crt
+          sudo chmod 644 index.html
+          
+          # 复制assets到根目录
+          mkdir -p assets
+          cp -r templates/assets/* assets/
+      
+      - name: 提交证书更新
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+          
+          git add certs/ index.html assets/
+          
+          # 获取当前日期
+          DATE=$(date +"%Y-%m-%d")
+          
+          git commit -m "更新CA证书库 ($DATE)" || echo "没有更改需要提交"
+          git push origin HEAD:${GITHUB_REF}
+      
+      - name: 创建新版本
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "CA证书库 ${{ github.event.repository.updated_at }}"
+          tag_name: "release-${{ github.event.repository.updated_at }}"
+          body: |
+            CA证书自动更新，发布日期: ${{ github.event.repository.updated_at }}
+            
+            此版本包含从以下来源收集的最新CA根证书:
+            - Ubuntu ca-certificates
+            - Firefox的PEM证书链
+            - Microsoft Windows证书更新
+            - Python certifi库
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

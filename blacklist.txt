@@ -1,0 +1,34 @@
+# CA证书撤销列表
+# 包含已知被撤销的CA证书的SHA-1指纹
+# 每行一个指纹，格式为小写且不含冒号
+# 数据来源：https://wiki.mozilla.org/CA/Removed_Certificates
+
+# DigiNotar根证书 (2011年安全事件)
+0439671bec6db5e2e461ec4f7c26fb9f610cad77
+
+# 中国互联网络信息中心撤销的证书 (2015年事件)
+4aefc3d37e64509148008db8bcf23596b8ce66fd
+a01de019a73bef98ddae1dc9f1ef53f168418c76
+
+# WoSign问题证书 (2016年事件)
+1632478d89f9213a92008563f5a4a7d312408ad6
+5cf9d536a2168c5316833828c5fc1731d0d402a6
+72f369aff465687a9b43c1ad1eb8c0c18393ad9f
+
+# PROCERT问题证书 (2018年事件)
+5d58aa862de252f81d77e4f87ec309187d8ebfd6
+
+# Symantec撤销的证书 (2018年事件)
+2399561127a57125de8cefea610ddf2fa078b5c8
+7122e4665d68961ecbaa839cf571094c9a947f4a
+2b8f1b57330dbba2d07a6c51f70ee90ddab9ad8e
+
+# Let's Encrypt问题证书 (2020年事件)
+e6b8f8766845a2ce025e4c1be72e668f15bf0b2a
+
+# TrustCor问题证书 (2022年事件)
+02faf3e291435468607857694df5e45b68851868
+d4de20d05e66fc53fe1a50882c78db2852cae474
+
+# Camerfirma问题证书 (2023年事件)
+786a74ac76ab147f9c6a3050ba9ea87efe9ace3c
