@@ -1174,9 +1174,9 @@ def main():
     logger.info(f"从Ubuntu收集了 {len(ubuntu_certs)} 个证书")
     
     # # 从Firefox收集 （耗时长）
-    # firefox_certs = collect_firefox_certs(verbose=verbose)
-    # collected_certs.extend(firefox_certs)
-    # logger.info(f"从Firefox收集了 {len(firefox_certs)} 个证书")
+    firefox_certs = collect_firefox_certs(verbose=verbose)
+    collected_certs.extend(firefox_certs)
+    logger.info(f"从Firefox收集了 {len(firefox_certs)} 个证书")
     
     # 从Windows收集
     windows_certs = collect_windows_certs(verbose=verbose)

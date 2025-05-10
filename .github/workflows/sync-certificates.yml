@@ -56,9 +56,10 @@ jobs:
           DATE=$(date +"%Y-%m-%d")
           
           git commit -m "更新CA证书库 ($DATE)" || echo "没有更改需要提交"
-          git push origin HEAD:${GITHUB_REF}
+          git push "https://${{ secrets.REPO_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" HEAD:${GITHUB_REF}
 
       - name: 压缩日志文件
+        if: always()
         run: |
           # 创建日志目录
           mkdir -p logs
@@ -74,6 +75,7 @@ jobs:
 
       - name: 上传日志文件
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: logs
           path: logs.tar.gz
