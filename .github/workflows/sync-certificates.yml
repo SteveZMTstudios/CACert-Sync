@@ -58,14 +58,25 @@ jobs:
           git commit -m "更新CA证书库 ($DATE)" || echo "没有更改需要提交"
           git push origin HEAD:${GITHUB_REF}
 
+      - name: 压缩日志文件
+        run: |
+          # 创建日志目录
+          mkdir -p logs
+          
+          # 复制所有日志文件到logs目录
+          find . -name "*.log" -exec cp {} logs/ \;
+          find . -name "*log*" -type f -not -path "*/\.*" -not -path "*/logs/*" -exec cp {} logs/ \;
+          
+          # 压缩日志文件
+          tar -czvf logs.tar.gz logs/
+          
+          echo "日志文件已压缩为 logs.tar.gz"
+
       - name: 上传日志文件
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: log-files
-          path: |
-            *.log
-            *log*
-            **/*.log
+          name: logs
+          path: logs.tar.gz
           retention-days: 60
       
       - name: 创建新版本
