@@ -5,7 +5,6 @@
 证书收集系统命令行工具
 """
 
-import os
 import sys
 import argparse
 import subprocess
@@ -84,6 +83,8 @@ def main():
     sync_parser = subparsers.add_parser("sync", help="同步证书")
     sync_parser.add_argument("--clean", action="store_true", help="清理现有证书")
     sync_parser.add_argument("--noverbose", action="store_true", help="减少输出详细信息")
+    sync_parser.add_argument("-v","--verbose", action="store_true", help="输出详细信息和调试")
+    
     
     # 测试命令
     test_parser = subparsers.add_parser("test", help="运行测试")

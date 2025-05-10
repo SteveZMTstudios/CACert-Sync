@@ -1,6 +1,21 @@
+# python venv
 venv/
+
+# macos shit
 .DS_Store/
+
+# venv cache
 __pycache__/
+
+# unit test dummy certs
 test-certs/
 *.pyc
+
+# force use the Github Actions build
 certs/*.*
+
+# notrash
+temp/
+
+# log noneed
+*log*
