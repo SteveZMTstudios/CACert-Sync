@@ -24,14 +24,13 @@ jobs:
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip
-          pip install certifi requests bs4 lxml
-          pip install pyopenssl
+          pip3 install -r requirements.txt
           sudo apt-get update
           sudo apt-get install -y ca-certificates libnss3-tools openssl cabextract wget
       
       - name: 同步证书
         run: |
-          sudo python scripts/sync_certificates.py --clean | tee run.log
+          python3 scripts/sync_certificates.py --clean | tee run.log
           
           # 获取证书数量
           CERT_COUNT=$(find certs -name "*.crt" | wc -l)
