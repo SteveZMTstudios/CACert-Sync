@@ -37,7 +37,11 @@ source venv/bin/activate
 # 安装依赖
 echo -e "${BLUE}安装依赖...${NC}"
 pip install --upgrade pip
-pip install requests certifi
+if [ -f "requirements.txt" ]; then
+    pip install -r requirements.txt
+else
+    pip install beautifulsoup4 requests certifi
+fi
 
 # 设置环境
 echo -e "${BLUE}设置环境...${NC}"
