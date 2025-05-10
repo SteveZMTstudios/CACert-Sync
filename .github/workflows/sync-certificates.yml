@@ -23,15 +23,15 @@ jobs:
       
       - name: 安装依赖
         run: |
-          sudo python -m pip install --upgrade pip
+          python -m pip install --upgrade pip
           sudo pip install -r requirements.txt
           sudo apt-get update
           sudo apt-get install -y ca-certificates libnss3-tools openssl cabextract wget
       
       - name: 同步证书
         run: |
+          # 使用sudo执行脚本以获取root权限
           sudo python3 scripts/sync_certificates.py --clean | tee run.log
-          
           # 获取证书数量
           CERT_COUNT=$(find certs -name "*.crt" | wc -l)
           echo "收集到 $CERT_COUNT 个证书"
