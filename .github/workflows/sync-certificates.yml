@@ -7,6 +7,10 @@ on:
     - cron: '4 16 15 6 *'
   workflow_dispatch: 
 
+permissions:
+  contents: write
+  packages: read
+
 jobs:
   sync-certificates:
     runs-on: ubuntu-latest
