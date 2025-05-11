@@ -97,13 +97,20 @@ jobs:
           path: logs.tar.gz
           retention-days: 60
       
+      - name: 获取当前日期时间
+        id: datetime
+        run: |
+          echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+          echo "datetime=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+          echo "isodate=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: 创建新版本
         uses: softprops/action-gh-release@v1
         with:
-          name: "CA证书库 ${{ github.event.repository.updated_at }}"
-          tag_name: "release-${{ github.event.repository.updated_at }}"
+          name: "CA证书库 ${{ steps.datetime.outputs.date }}"
+          tag_name: "release-${{ steps.datetime.outputs.datetime }}"
           body: |
-            CA证书自动更新，发布日期: ${{ github.event.repository.updated_at }}
+            CA证书自动更新，发布日期: ${{ steps.datetime.outputs.isodate }}
             
             此版本包含从以下来源收集的最新CA根证书:
             - Ubuntu ca-certificates
