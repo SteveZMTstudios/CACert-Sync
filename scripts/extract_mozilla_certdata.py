@@ -7,6 +7,7 @@
 
 import os
 import sys
+import re
 import base64
 import argparse
 from pathlib import Path
@@ -28,55 +29,68 @@ def read_certdata(certdata_path: str) -> List[str]:
 
 
 def extract_certs(certdata_lines: List[str]) -> List[Dict[str, str]]:
-    """从certdata.txt行中提取证书"""
-    certs = []
-    current_cert = None
-    in_cert = False
-    in_label = False
-    label = ""
-    cert_data = []
-    
-    for line in certdata_lines:
-        line = line.strip()
-        
-        # 开始一个新证书
-        if line.startswith("CKA_LABEL") and "UTF8" in line:
-            in_label = True
+    """从certdata.txt行中提取证书
+
+    兼容NSS certdata格式：
+    - 标签在同一行：CKA_LABEL UTF8 "..."
+    - 证书值：CKA_VALUE MULTILINE_OCTAL 之后若干行以 \ooo 八进制转义表示，直至单独一行 END
+    - 忽略注释行和非证书对象中的值
+    """
+    certs: List[Dict[str, str]] = []
+    current_label: Optional[str] = None
+    in_value: bool = False
+    data_bytes: List[int] = []
+
+    label_re = re.compile(r'^CKA_LABEL\s+UTF8\s+"(.*)"\s*$')
+    value_begin_re = re.compile(r'^CKA_VALUE\s+MULTILINE_OCTAL\s*$')
+    end_re = re.compile(r'^END\s*$')
+    # 匹配所有 \ooo 八进制转义（1-3位八进制）
+    octet_re = re.compile(r'\\([0-7]{1,3})')
+
+    for raw in certdata_lines:
+        line = raw.rstrip("\n")
+        stripped = line.strip()
+
+        # 跳过注释与空行
+        if not stripped or stripped.startswith('#'):
             continue
-        
-        # 获取证书标签
-        if in_label and line.startswith('"'):
-            label = line.strip('"\\')
-            in_label = False
-            current_cert = {"label": label, "data": []}
-        
-        # 开始证书数据
-        if line.startswith("CKA_VALUE MULTILINE_OCTAL"):
-            in_cert = True
-            cert_data = []
+
+        # 解析标签（同一行）
+        m_label = label_re.match(stripped)
+        if m_label:
+            # 保留原始标签内容（支持包含逗号或引号的情况）
+            current_label = m_label.group(1)
             continue
-        
-        # 结束证书数据
-        if in_cert and line == "END":
-            in_cert = False
-            if current_cert:
-                current_cert["data"] = cert_data
-                certs.append(current_cert)
-                current_cert = None
+
+        # 检测值开始
+        if value_begin_re.match(stripped):
+            in_value = True
+            data_bytes = []
             continue
-        
-        # 收集证书数据
-        if in_cert and line:
-            # 处理八进制格式
-            oct_values = line.split("\\")
-            for oct_value in oct_values:
-                if oct_value:
+
+        # 收集值直到 END
+        if in_value:
+            if end_re.match(stripped):
+                in_value = False
+                if data_bytes:
+                    label = current_label if current_label else f"mozilla_cert_{len(certs):03d}"
+                    certs.append({
+                        "label": label,
+                        "data": data_bytes[:]
+                    })
+                # 一个对象结束后，不强制清除label，因为同一对象顺序通常是先label后value
+                # 但为避免跨对象污染，若后续对象未设置新label，将自动使用默认名
+                current_label = None
+                data_bytes = []
+            else:
+                # 从当前行提取所有八进制转义
+                for m in octet_re.finditer(stripped):
                     try:
-                        byte_value = int(oct_value, 8) & 0xFF
-                        cert_data.append(byte_value)
-                    except ValueError:
-                        pass
-    
+                        data_bytes.append(int(m.group(1), 8) & 0xFF)
+                    except Exception:
+                        # 忽略异常字节
+                        continue
+
     return certs
 
 

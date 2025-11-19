@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from bs4 import BeautifulSoup
 
+# 新的Mozilla证书源：直接解析NSS的certdata.txt，避免大量访问crt.sh导致429
+MOZILLA_CERTDATA_URL = "https://hg-edge.mozilla.org/releases/mozilla-release/raw-file/default/security/nss/lib/ckfw/builtins/certdata.txt"
+
 # 配置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -36,7 +39,8 @@ SOURCES_DIR = {
     "ubuntu": TEMP_DIR / "ubuntu",
     "firefox": TEMP_DIR / "firefox",
     "windows": TEMP_DIR / "windows",
-    "certifi": TEMP_DIR / "certifi"
+    "certifi": TEMP_DIR / "certifi",
+    "curl": TEMP_DIR / "curl"
 }
 
 
@@ -373,6 +377,50 @@ def collect_firefox_certs(verbose: bool = True) -> List[Path]:
     
     except Exception as e:
         logger.error(f"从Mozilla收集证书时出错: {e}")
+        return []
+
+
+def collect_mozilla_certdata_certs(verbose: bool = True) -> List[Path]:
+    """通过下载并解析Mozilla NSS certdata.txt获取根证书
+
+    优点：
+    - 单一文件下载，避免对CCADB及crt.sh的大量请求触发速率限制(429)
+    - 与curl / certifi来源一致性高
+    缺点：
+    - certdata.txt 可能偶尔结构调整，需要维护解析脚本
+    """
+    logger.info("使用Mozilla certdata.txt获取证书...")
+    source_dir = SOURCES_DIR["firefox"]  # 复用firefox目录以保持下游逻辑不变
+    if source_dir.exists():
+        shutil.rmtree(source_dir)
+    source_dir.mkdir(exist_ok=True, parents=True)
+
+    try:
+        # 下载certdata.txt
+        certdata_path = TEMP_DIR / "mozilla-certdata.txt"
+        run_command(["wget", "-O", certdata_path.as_posix(), MOZILLA_CERTDATA_URL], verbose=verbose)
+        if not certdata_path.exists() or certdata_path.stat().st_size == 0:
+            logger.warning("下载的certdata.txt为空或不存在")
+            return []
+
+        # 调用现有的解析脚本
+        extract_script = SCRIPT_DIR / "extract_mozilla_certdata.py"
+        if not extract_script.exists():
+            logger.error("缺少解析脚本 extract_mozilla_certdata.py")
+            return []
+
+        run_command([
+            sys.executable,
+            extract_script.as_posix(),
+            "--source", certdata_path.as_posix(),
+            "--destination", source_dir.as_posix()
+        ], verbose=verbose)
+
+        certs = list(source_dir.glob("mozilla-*.crt"))
+        logger.info(f"通过certdata.txt解析得到 {len(certs)} 个证书")
+        return certs
+    except Exception as e:
+        logger.error(f"解析Mozilla certdata.txt时出错: {e}")
         return []
 
 
@@ -733,6 +781,62 @@ sys.stdout.write(certifi.where())
     
     except Exception as e:
         logger.error(f"从certifi收集证书时出错: {e}")
+        return []
+
+
+def collect_curl_certs(verbose: bool = True) -> List[Path]:
+    """从cURL官方提供的 CA bundle 收集根证书
+
+    下载 https://curl.se/ca/cacert.pem 并拆分成单独证书文件。
+    与 certifi 处理方式类似，以便后续统一去重 / 解析。
+    """
+    logger.info("从cURL CA bundle收集证书...")
+
+    source_dir = SOURCES_DIR["curl"]
+    if source_dir.exists():
+        shutil.rmtree(source_dir)
+    source_dir.mkdir(exist_ok=True, parents=True)
+
+    bundle_url = "https://curl.se/ca/cacert.pem"
+    bundle_path = TEMP_DIR / "curl-cacert.pem"
+
+    try:
+        # 确保有下载工具
+        try:
+            run_command(["wget", "--version"], verbose=False)
+            downloader = ["wget", "-O", bundle_path.as_posix(), bundle_url]
+        except Exception:
+            # wget 不可用时尝试 curl
+            downloader = ["curl", "-fsSL", bundle_url, "-o", bundle_path.as_posix()]
+
+        run_command(downloader, verbose=verbose)
+
+        if not bundle_path.exists() or bundle_path.stat().st_size == 0:
+            logger.warning("cURL bundle 下载失败或为空")
+            return []
+
+        cert_index = 0
+        with open(bundle_path, "r", encoding="utf-8", errors="ignore") as f:
+            current = []
+            in_cert = False
+            for line in f:
+                if "-----BEGIN CERTIFICATE-----" in line:
+                    in_cert = True
+                    current = [line]
+                elif "-----END CERTIFICATE-----" in line and in_cert:
+                    current.append(line)
+                    cert_file = source_dir / f"curl-{cert_index:03d}.crt"
+                    with open(cert_file, "w", encoding="utf-8") as out:
+                        out.write("".join(current))
+                    cert_index += 1
+                    in_cert = False
+                elif in_cert:
+                    current.append(line)
+
+        logger.info(f"从cURL bundle拆分得到 {cert_index} 个证书")
+        return list(source_dir.glob("*.crt"))
+    except Exception as e:
+        logger.error(f"从cURL收集证书时出错: {e}")
         return []
 
 
@@ -1173,10 +1277,13 @@ def main():
     collected_certs.extend(ubuntu_certs)
     logger.info(f"从Ubuntu收集了 {len(ubuntu_certs)} 个证书")
     
-    # # 从Firefox收集 （耗时长）
-    firefox_certs = collect_firefox_certs(verbose=verbose)
+    # 优先使用Mozilla certdata.txt方式获取，避免CCADB速率限制
+    firefox_certs = collect_mozilla_certdata_certs(verbose=verbose)
+    if not firefox_certs:
+        logger.warning("certdata.txt方式未获取到证书，回退到CCADB抓取方式")
+        firefox_certs = collect_firefox_certs(verbose=verbose)
     collected_certs.extend(firefox_certs)
-    logger.info(f"从Firefox收集了 {len(firefox_certs)} 个证书")
+    logger.info(f"从Mozilla源收集了 {len(firefox_certs)} 个证书")
     
     # 从Windows收集
     windows_certs = collect_windows_certs(verbose=verbose)
@@ -1187,6 +1294,11 @@ def main():
     certifi_certs = collect_certifi_certs(verbose=verbose)
     collected_certs.extend(certifi_certs)
     logger.info(f"从certifi收集了 {len(certifi_certs)} 个证书")
+
+    # 从cURL CA bundle收集
+    curl_certs = collect_curl_certs(verbose=verbose)
+    collected_certs.extend(curl_certs)
+    logger.info(f"从cURL收集了 {len(curl_certs)} 个证书")
     
     # 处理和存储证书
     cert_info_map = process_and_store_certs(collected_certs, verbose=verbose)

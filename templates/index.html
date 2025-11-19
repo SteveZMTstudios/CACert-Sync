@@ -130,6 +130,12 @@
       border: 1px solid #c0d0ee;
       position: relative;
     }
+    .chain-check-container {
+      margin: 10px 0;
+      padding: 8px;
+      background-color: #eef2fb;
+      border: 1px solid #c0d0ee;
+    }
     .search-input {
       width: 60%;
       padding: 4px;
@@ -176,16 +182,28 @@
         margin: 0;
         border: none;
       }
+      .content {
+        overflow-x: auto;
+      }
+      table {
+        min-width: 100%;
+      }
       table, td, th {
         font-size: 11px;
         padding: 4px;
       }
       /* 在小屏幕上重新调整列宽 */
       th:nth-child(1) { 
-        width: 40%; 
+        width: 35%; 
       }
       th:nth-child(2) { 
         width: 25%; 
+      }
+      th:nth-child(3) { 
+        width: 25%; 
+      }
+      th:nth-child(4) { 
+        width: 15%; 
       }
       .search-input {
         width: 70%;
@@ -250,7 +268,53 @@
       text-decoration: none;
       color: inherit;
     }
+    /* 回退 CSS：在不支持 flex 的非常旧浏览器上使用浮动布局 */
+    .title-line-old-fallback:after { content: ""; display: table; clear: both; }
+    .title-icon { float:left; margin-right:10px; }
+    .title-text { display:block; overflow:hidden; }
   </style>
+  <!-- Polyfill：帮助旧浏览器加载（JSON / Promise / fetch / HTML5 shiv / ES5 方法） -->
+  <script type="text/javascript">
+  <!--
+  (function(window, document){
+    // HTML5 元素 shiv
+    var html5Els = 'article aside figcaption figure footer header hgroup main nav section time'.split(' ');
+    for (var i = 0; i < html5Els.length; i++) { try { document.createElement(html5Els[i]); } catch(e){} }
+
+    // 基本 JSON 支持（非常精简）
+    if (!window.JSON) {
+      window.JSON = { parse: function(str){ return (new Function('return ' + str))(); }, stringify: function(o){ return String(o); } };
+    }
+
+    // ES5 补丁
+    if (!Array.prototype.forEach) { Array.prototype.forEach = function(cb, ctx){ for (var i = 0; i < this.length; i++) if (i in this) cb.call(ctx, this[i], i, this); }; }
+    if (!String.prototype.trim) { String.prototype.trim = function(){ return this.replace(/^\s+|\s+$/g, ''); }; }
+
+    // Very small Promise polyfill
+    if (!window.Promise) {
+      window.Promise = function(executor){
+        var state = 'pending'; var value; var callbacks = [];
+        function resolve(v){ if (state !== 'pending') return; state = 'fulfilled'; value = v; setTimeout(function(){ for (var i = 0; i < callbacks.length; i++) callbacks[i](value); }, 0); }
+        function reject(r){ if (state !== 'pending') return; state = 'rejected'; value = r; setTimeout(function(){ for (var i = 0; i < callbacks.length; i++) callbacks[i](undefined, value); }, 0); }
+        this.then = function(onFulfilled, onRejected){
+          return new window.Promise(function(res, rej){
+            callbacks.push(function(val, err){ try { if (err) { if (typeof onRejected === 'function') res(onRejected(err)); else rej(err); } else { if (typeof onFulfilled === 'function') res(onFulfilled(val)); else res(val); } }catch(e){ rej(e); } });
+          });
+        };
+        try { executor(resolve, reject); } catch(e) { reject(e); }
+      };
+      window.Promise.prototype.catch = function(cb){ return this.then(null, cb); };
+      window.Promise.resolve = function(val){ return new window.Promise(function(res){ res(val); }); };
+      window.Promise.reject = function(err){ return new window.Promise(function(res, rej){ rej(err); }); };
+    }
+
+    // fetch() 简易实现（基于 XMLHttpRequest）
+    if (!window.fetch) {
+      window.fetch = function(url, opts){ opts = opts || {}; return new window.Promise(function(resolve, reject){ var xhr = new XMLHttpRequest(); try { xhr.open(opts.method || 'GET', url, true); } catch(e){ return reject(e); } if (opts.headers) { for (var h in opts.headers) if (opts.headers.hasOwnProperty(h)) xhr.setRequestHeader(h, opts.headers[h]); } xhr.onreadystatechange = function(){ if (xhr.readyState !== 4) return; var status = xhr.status === 1223 ? 204 : xhr.status; var ok = (status >= 200 && status < 300) || status === 0; var resp = { ok: ok, status: status, statusText: xhr.statusText, url: url, text: function(){ return new window.Promise(function(resText){ resText(xhr.responseText); }); }, json: function(){ return new window.Promise(function(resJson, rejJson){ try { resJson(JSON.parse(xhr.responseText)); } catch(e) { rejJson(e); } }); } }; if (ok) resolve(resp); else reject(new Error('网络错误(' + status + ')')); }; xhr.onerror = function(){ reject(new Error('网络错误')); }; try { xhr.send(opts.body || null); } catch(e) { reject(e); } }); };
+    }
+  })(window, document);
+  //-->
+  </script>
   
   <!-- 基本的搜索功能，设计为优雅降级 -->
   <script type="text/javascript">
@@ -296,6 +360,227 @@
   }
   //-->
   </script>
+
+  <script type="text/javascript">
+  <!--
+  function parseDNField(dn, key) {
+    if (!dn) { return ''; }
+    var regex = new RegExp('(?:^|, )' + key + '=([^,]+)');
+    var match = dn.match(regex);
+    return match ? match[1].trim() : '';
+  }
+
+  function filterTableByRoot(rootCN, rootOrg) {
+    var table = document.getElementById('certTable');
+    if (!table) { return false; }
+    var rows = table.getElementsByTagName('tr');
+    var hasMatch = false;
+    for (var i = 1; i < rows.length; i++) {
+      var name = (rows[i].cells[0] ? rows[i].cells[0].textContent : '').toLowerCase();
+      var issuer = (rows[i].cells[1] ? rows[i].cells[1].textContent : '').toLowerCase();
+      var found = false;
+      if (rootCN) {
+        var needle = rootCN.toLowerCase();
+        found = found || name.indexOf(needle) > -1 || issuer.indexOf(needle) > -1;
+      }
+      if (rootOrg) {
+        var orgNeedle = rootOrg.toLowerCase();
+        found = found || name.indexOf(orgNeedle) > -1 || issuer.indexOf(orgNeedle) > -1;
+      }
+      rows[i].style.display = found ? '' : 'none';
+      hasMatch = hasMatch || found;
+    }
+    return hasMatch;
+  }
+
+  function normalizeIssuerCandidates(issuer) {
+    if (!issuer) return [];
+    var s = issuer;
+    // 常用噪声词和年份去掉
+    s = s.replace(/\b(DV|EV|TLS|RSA|ECC|CA|Root|ROOT|G[0-9]|S?N|Class)\b/gi, ' ');
+    s = s.replace(/\b(20\d{2}|19\d{2})\b/g, ' ');
+    s = s.replace(/[\(\)\[\]\"\'\`]/g, '');
+    s = s.replace(/[^\w\u4e00-\u9fa5]+/g, ' ');
+    s = s.trim();
+    var parts = s.split(/\s+/).filter(Boolean);
+    var candidates = [];
+    // 原始整体
+    candidates.push(issuer);
+    // 简化后的整体
+    if (s) candidates.push(s);
+    // 分词后的候选（优先长词）
+    for (var i = 0; i < parts.length; i++) {
+      candidates.push(parts.slice(i).join(' '));
+      candidates.push(parts[i]);
+    }
+    // 去重并限制长度
+    var seen = {};
+    var out = [];
+    for (var j = 0; j < candidates.length && out.length < 8; j++) {
+      var c = candidates[j].trim();
+      if (!c) continue;
+      var key = c.toLowerCase();
+      if (!seen[key]) { seen[key] = true; out.push(c); }
+    }
+    return out;
+  }
+
+  function tryMatchByIssuerCandidates(cn, org) {
+    var tried = {};
+    var candidates = [];
+    if (cn) candidates = candidates.concat(normalizeIssuerCandidates(cn));
+    if (org) candidates = candidates.concat(normalizeIssuerCandidates(org));
+    for (var k = 0; k < candidates.length; k++) {
+      var cand = candidates[k];
+      if (!cand) continue;
+      if (tried[cand.toLowerCase()]) continue;
+      tried[cand.toLowerCase()] = true;
+      if (filterTableByRoot(cand, cand)) return true;
+    }
+    return false;
+  }
+
+  var corsProxyBuilders = [
+    function(url) { return url; },
+    function(url) { return 'http://cors-proxy.cf.miniproj.stevezmt.top/?url=' + encodeURIComponent(url); },
+    function(url) { return 'https://cors.isomorphic-git.org/' + url; },
+    function(url) { return 'https://corsproxy.io/?' + url; },
+    function(url) { return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url); },
+    function(url) { return 'https://thingproxy.freeboard.io/fetch/' + url; }
+  ];
+  var preferredProxy = 0;
+
+  // Cloudflare Worker (优先使用)，请部署到 ca-check.cf.miniproj.stevezmt.top 或修改为你的地址
+  var cfWorkerBase = 'https://ca-check.cf.miniproj.stevezmt.top';
+
+  function fetchJsonWithCorsFallback(url) {
+    return new Promise(function(resolve, reject){
+      var lastError = null;
+      var tryProxy = function(indexOffset){
+        if (indexOffset >= corsProxyBuilders.length) { reject(lastError || new Error('请求失败：远程接口不可用或被浏览器拦截。')); return; }
+        var index = (preferredProxy + indexOffset) % corsProxyBuilders.length;
+        var target = corsProxyBuilders[index](url);
+        fetch(target).then(function(response){
+          if (!response.ok) {
+            throw new Error('网络错误(' + response.status + ')');
+          }
+          return response.text().then(function(bodyText){
+            try {
+              var json = JSON.parse(bodyText);
+              preferredProxy = index;
+              resolve(json);
+            } catch (parseErr) {
+              var snippet = bodyText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+              throw new Error('响应不是 JSON：' + (snippet || '未知内容'));
+            }
+          });
+        }).catch(function(err){
+          lastError = err;
+          tryProxy(indexOffset + 1);
+        });
+      };
+      tryProxy(0);
+    });
+  }
+
+  function callCrtSh(domain) {
+    return new Promise(function(resolve, reject){
+      // 尝试使用 Cloudflare Worker
+      try {
+        var probeUrl = cfWorkerBase + '/probe?host=' + encodeURIComponent(domain);
+        fetch(probeUrl).then(function(probeResp){
+          if (probeResp && probeResp.ok) {
+            return probeResp.json();
+          }
+          return null;
+        }).then(function(probeJson){
+          if (probeJson && (probeJson.rootCN || probeJson.rootOrg)) {
+            resolve({ rootCN: probeJson.rootCN || '', rootOrg: probeJson.rootOrg || '' });
+            return;
+          }
+          // 否则继续使用 crt.sh
+          var endpoint = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
+          return fetchJsonWithCorsFallback(endpoint).then(function(payload){
+            if (!Array.isArray(payload) || payload.length === 0) {
+              throw new Error('crt.sh 未返回证书数据');
+            }
+            var latestCert = payload[0];
+            var issuerName = latestCert.issuer_name || '';
+            var rootCN = parseDNField(issuerName, 'CN');
+            var rootOrg = parseDNField(issuerName, 'O');
+            resolve({ rootCN: rootCN, rootOrg: rootOrg });
+          });
+        }).catch(function(err){
+          // 侦测失败，尝试直接调用 crt.sh
+          var endpoint = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
+          fetchJsonWithCorsFallback(endpoint).then(function(payload){
+            if (!Array.isArray(payload) || payload.length === 0) { throw new Error('crt.sh 未返回证书数据'); }
+            var latestCert = payload[0];
+            var issuerName = latestCert.issuer_name || '';
+            var rootCN = parseDNField(issuerName, 'CN');
+            var rootOrg = parseDNField(issuerName, 'O');
+            resolve({ rootCN: rootCN, rootOrg: rootOrg });
+          }).catch(function(err2){ reject(err2); });
+        });
+      } catch(e) {
+        // 如果 probe 过程有异常，直接查询 crt.sh
+        var endpoint = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
+        fetchJsonWithCorsFallback(endpoint).then(function(payload){
+          if (!Array.isArray(payload) || payload.length === 0) { throw new Error('crt.sh 未返回证书数据'); }
+          var latestCert = payload[0];
+          var issuerName = latestCert.issuer_name || '';
+          var rootCN = parseDNField(issuerName, 'CN');
+          var rootOrg = parseDNField(issuerName, 'O');
+          resolve({ rootCN: rootCN, rootOrg: rootOrg });
+        }).catch(function(err3){ reject(err3); });
+      }
+    });
+  }
+
+  function checkCertChain() {
+    var resultEl = document.getElementById('chainResults');
+    if (!resultEl) { return; }
+    try {
+      var urlInput = document.getElementById('urlInput');
+      var rawValue = urlInput ? (typeof urlInput.value === 'string' ? urlInput.value.trim() : urlInput.value) : '';
+      if (!rawValue) { resultEl.innerHTML = '请输入有效的 URL。'; return; }
+      var domain = rawValue.replace(/^https?:\/\//, '').split('/')[0].split(':')[0];
+      if (!domain) { resultEl.innerHTML = '请输入有效的 URL。'; return; }
+      resultEl.innerHTML = '<img src="//passwordreset.microsoftonline.com/images/wait_animation.gif">正在查询证书链，这可能需要几分钟...';
+      callCrtSh(domain).then(function(rootInfo){
+        var rootCN = rootInfo.rootCN;
+        var rootOrg = rootInfo.rootOrg;
+        if (!rootCN && !rootOrg) { resultEl.innerHTML = '未找到根证书信息。'; return; }
+        var matched = tryMatchByIssuerCandidates(rootCN, rootOrg);
+        if (matched) resultEl.innerHTML = '已筛选出可能需要安装的根证书：' + (rootCN || rootOrg || '未知');
+        else resultEl.innerHTML = '未在本库中找到匹配的根证书：' + (rootCN || rootOrg || '未知');
+      }).catch(function(err){
+        var msg = err && err.message ? err.message : String(err);
+        resultEl.innerHTML = '检测失败：' + msg + '。建议稍后重试或在桌面环境通过 openssl s_client 检查。';
+      });
+    } catch (ex) { resultEl.innerHTML = '检测失败：' + String(ex); }
+  }
+
+  function resetTable() {
+    var table = document.getElementById('certTable');
+    if (!table) { return; }
+    var rows = table.getElementsByTagName('tr');
+    for (var i = 0; i < rows.length; i++) {
+      rows[i].style.display = '';
+    }
+    var resultEl = document.getElementById('chainResults');
+    if (resultEl) {
+      resultEl.innerHTML = '';
+    }
+    var urlInput = document.getElementById('urlInput');
+    if (urlInput) {
+      urlInput.value = '';
+    }
+  }
+  //-->
+  </script>
+  
+
 </head>
 <body>
   <div class="container">
@@ -315,8 +600,28 @@
     </div>
     
     <div class="content">
+      <noscript>
+        <div class="info rounded" style="background-color:#fff6e6;border-color:#ffd59e;color:#704214;">
+          该页面的搜索和证书链检测功能需要启用 JavaScript。若您的浏览器过旧或禁用了 JavaScript，建议使用桌面环境的 openssl 或更新浏览器以获得完整体验。
+        </div>
+      </noscript>
       <h2>可下载的证书列表</h2>
       <p>点击下载图标可直接下载单个证书文件（.crt格式）</p>
+      
+
+      
+      <div class="chain-check-container rounded">
+        <h3>检测证书链</h3>
+        <p>输入网站 URL，系统将查询其证书链并筛选本库中可能需要安装的根证书。</p>
+        <div>
+          <input type="text" id="urlInput" class="search-input rounded" placeholder="例如: https://example.com">
+          <button type="button" class="search-button" onclick="checkCertChain()">
+            <img src="templates/assets/search@32x32.png" alt="检测" width="24" height="24">
+          </button>
+          <button type="button" class="download-button" onclick="resetTable()">重置</button>
+        </div>
+        <div id="chainResults" style="margin-top: 10px;"></div>
+      </div>
       
       <div class="search-container rounded">
         <input type="text" id="searchInput" class="search-input rounded" placeholder="搜索证书名、发布者、有效期..." onkeyup="searchTable()">
