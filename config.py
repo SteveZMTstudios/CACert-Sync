@@ -28,7 +28,7 @@ CERTS_DIR = "certs"
 METADATA = {
     "title": "CA证书库",
     "description": "提供最新的可信CA根证书的收集库",
-    "github": "https://github.com/yourusername/cacert-sync",
+    "github": "https://github.com/stevezmtstudios/cacert-sync",
     "version": "1.0.0"
 }
 

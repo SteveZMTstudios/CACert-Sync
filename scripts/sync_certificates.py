@@ -43,6 +43,8 @@ SOURCES_DIR = {
     "curl": TEMP_DIR / "curl"
 }
 
+AUTHROOT_STL_CAB_URL = "https://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab"
+
 
 def setup_directories() -> None:
     """设置所需的目录结构"""
@@ -1166,6 +1168,79 @@ def process_and_store_certs(collected_certs: List[Path], verbose: bool = True) -
     return cert_info_map
 
 
+def build_aggregate_cert_bundle(verbose: bool = True) -> None:
+    """聚合根证书并生成一键更新文件到 certs/all 目录"""
+    logger.info("生成聚合证书包 certs/all ...")
+
+    aggregate_dir = CERTS_DIR / "all"
+    if aggregate_dir.exists():
+        shutil.rmtree(aggregate_dir)
+    aggregate_dir.mkdir(exist_ok=True, parents=True)
+
+    cert_files = sorted(CERTS_DIR.glob("*.crt"))
+    if not cert_files:
+        logger.warning("certs目录中没有可聚合的证书，跳过生成 certs/all")
+        return
+
+    cacerts_pem = aggregate_dir / "cacerts.pem"
+    cacerts_crt = aggregate_dir / "cacerts.crt"
+    cacerts_p12 = aggregate_dir / "cacerts.p12"
+    cacert_der = aggregate_dir / "cacert.der"
+    authroot_cab = aggregate_dir / "authrootstl.cab"
+
+    with open(cacerts_pem, "w", encoding="utf-8") as pem_out:
+        for cert_file in cert_files:
+            with open(cert_file, "r", encoding="utf-8", errors="ignore") as cert_in:
+                content = cert_in.read().strip()
+                if not content:
+                    continue
+                pem_out.write(content)
+                pem_out.write("\n\n")
+
+    shutil.copy2(cacerts_pem, cacerts_crt)
+
+    try:
+        run_command([
+            "openssl", "pkcs12", "-export", "-nokeys",
+            "-in", cacerts_pem.as_posix(),
+            "-out", cacerts_p12.as_posix(),
+            "-passout", "pass:",
+            "-name", "CACert-Sync Root CAs"
+        ], verbose=verbose)
+    except Exception as e:
+        logger.warning(f"生成 cacerts.p12 失败: {e}")
+
+    try:
+        run_command([
+            "openssl", "crl2pkcs7", "-nocrl",
+            "-certfile", cacerts_pem.as_posix(),
+            "-outform", "DER",
+            "-out", cacert_der.as_posix()
+        ], verbose=verbose)
+    except Exception as e:
+        logger.warning(f"使用PKCS7方式生成 cacert.der 失败: {e}")
+        try:
+            run_command([
+                "openssl", "x509",
+                "-in", cert_files[0].as_posix(),
+                "-outform", "DER",
+                "-out", cacert_der.as_posix()
+            ], verbose=verbose)
+        except Exception as e2:
+            logger.warning(f"回退方式生成 cacert.der 失败: {e2}")
+
+    try:
+        run_command(["wget", "-O", authroot_cab.as_posix(), AUTHROOT_STL_CAB_URL], verbose=verbose)
+    except Exception as e:
+        logger.warning(f"wget 下载 authrootstl.cab 失败，尝试 curl: {e}")
+        try:
+            run_command(["curl", "-L", "-o", authroot_cab.as_posix(), AUTHROOT_STL_CAB_URL], verbose=verbose)
+        except Exception as e2:
+            logger.warning(f"curl 下载 authrootstl.cab 失败: {e2}")
+
+    logger.info("聚合证书包生成完成")
+
+
 def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> None:
     """生成HTML页面展示证书列表"""
     logger.info("生成HTML页面...")
@@ -1184,12 +1259,12 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
     # 将证书信息按照证书名称排序
     sorted_certs = []
     for cert_name, info in cert_info_map.items():
-        # 获取证书通用名称（CN）作为显示名称
-        # 保留原始格式，包括引号和特殊字符
-        cert_display_name = info.get("subject_cn", "")
+        # 获取证书显示名称：优先CN，其次组织名O
+        cert_display_name = info.get("subject_cn", "") or info.get("subject_o", "")
         if not cert_display_name:
-            # 如果没有CN，则使用文件名的前部分（不包含指纹）
-            cert_display_name = cert_name.split('_')[0].replace('_', ' ')
+            # 如果没有可用主题字段，则使用文件名并仅去掉末尾的指纹后缀
+            cert_name_without_suffix = cert_name.rsplit('_', 1)[0] if '_' in cert_name else cert_name
+            cert_display_name = cert_name_without_suffix.replace('_', ' ')
             
         issuer = info.get("subject_o", "") or info.get("subject_cn", "未知")
         valid_until = info.get("not_after", "未知")
@@ -1202,10 +1277,10 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
     for cert_name, cert_display_name, issuer, valid_until in sorted_certs:
         cert_list_html.append(f"""
         <tr>
-          <td>{cert_display_name}</td>
-          <td>{issuer}</td>
-          <td>{valid_until}</td>
-          <td><a href="certs/{cert_name}.crt" class="download-link"><button class="download-button"><img src="assets/download@32x32.png" alt="下载" width="16" height="16" title="下载 {cert_display_name}.crt"></button></a></td>
+          <td><span class="cert-name">{cert_display_name}</span></td>
+          <td><span class="issuer">{issuer}</span></td>
+          <td><span class="valid-until">{valid_until}</span></td>
+          <td><a href="certs/{cert_name}.crt" class="download-link"><button class="download-button"><img src="assets/download@32x32.png" alt="下载" width="16" height="16" title="下载 {cert_name}.crt"></button></a></td>
         </tr>
         """)
     
@@ -1222,20 +1297,24 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
         f.write(html_content)
     
     logger.info(f"HTML页面已生成: {output_path}")
-    
-    # # 确保assets目录存在并包含必要文件
-    # assets_dir = ROOT_DIR / "templates" / "assets"
-    # template_assets_dir = ROOT_DIR / "templates" / "assets"
-    
-    # if template_assets_dir.exists() and not assets_dir.exists():
-    #     # 创建assets目录
-    #     assets_dir.mkdir(exist_ok=True, parents=True)
-        
-    #     # 复制所有资源文件
-    #     for asset_file in template_assets_dir.glob("*"):
-    #         shutil.copy(asset_file, assets_dir / asset_file.name)
-        
-    #     logger.info("复制资源文件到assets目录")
+
+
+def sync_template_assets() -> None:
+    """同步模板静态资源到发布目录assets"""
+    template_assets_dir = ROOT_DIR / "templates" / "assets"
+    assets_dir = ROOT_DIR / "assets"
+
+    if not template_assets_dir.exists():
+        logger.warning("模板资源目录不存在，跳过资源同步")
+        return
+
+    assets_dir.mkdir(exist_ok=True, parents=True)
+
+    for asset_file in template_assets_dir.glob("*"):
+        if asset_file.is_file():
+            shutil.copy(asset_file, assets_dir / asset_file.name)
+
+    logger.info("已同步模板资源到assets目录")
 
 
 def main():
@@ -1302,8 +1381,12 @@ def main():
     
     # 处理和存储证书
     cert_info_map = process_and_store_certs(collected_certs, verbose=verbose)
+
+    # 生成聚合证书包，便于设备一键更新
+    build_aggregate_cert_bundle(verbose=verbose)
     
     # 生成HTML页面
+    sync_template_assets()
     index_path = ROOT_DIR / "index.html"
     generate_html_page(cert_info_map, index_path)
     

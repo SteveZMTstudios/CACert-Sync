@@ -35,7 +35,7 @@
 
 1. 克隆仓库：
    ```bash
-   git clone https://github.com/yourusername/cacert-sync.git
+   git clone https://github.com/stevezmtstudios/cacert-sync.git
    cd cacert-sync
    ```
 
@@ -68,10 +68,6 @@
 ## 手动触发更新
 
 可以通过GitHub Actions页面手动触发更新流程。
-
-## 证书撤销处理
-
-系统会自动处理已撤销的证书，将它们从证书库中移除。已撤销的证书列表来源于Mozilla、Microsoft和其他可信来源。
 
 ## 浏览器兼容性
 
