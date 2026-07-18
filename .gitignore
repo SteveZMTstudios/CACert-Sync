@@ -19,3 +19,9 @@ temp/
 
 # log noneed
 *log*
+
+# node modules
+node_modules
+
+# user 
+.test

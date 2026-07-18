@@ -115,6 +115,48 @@ def run_command(command: List[str], cwd: Optional[Path] = None, verbose: bool = 
         return result.stdout
 
 
+def download_file(url: str, dest_path: Path, verbose: bool = True) -> bool:
+    """下载文件到指定路径，使用自定义 User-Agent 并带重试和 shell 命令备份"""
+    logger.debug(f"正在下载: {url} -> {dest_path}")
+    import urllib.request
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            with open(dest_path, 'wb') as f:
+                f.write(response.read())
+        return True
+    except Exception as e:
+        logger.warning(f"Python 下载失败: {url}, 错误: {e}。尝试使用 shell 命令...")
+        try:
+            cmd = ["wget", "-U", headers['User-Agent'], "-O", dest_path.as_posix(), url]
+            run_command(cmd, verbose=verbose)
+            return True
+        except Exception as e2:
+            logger.warning(f"wget 下载失败: {e2}")
+            try:
+                cmd = ["curl", "-H", f"User-Agent: {headers['User-Agent']}", "-L", "-o", dest_path.as_posix(), url]
+                run_command(cmd, verbose=verbose)
+                return True
+            except Exception as e3:
+                logger.error(f"所有下载方式均失败: {url}, 错误: {e3}")
+                return False
+
+
+def extract_cab(cab_path: Path, dest_dir: Path, verbose: bool = True) -> None:
+    """解压 CAB 压缩包到目标目录"""
+    if dest_dir.exists():
+        shutil.rmtree(dest_dir)
+    dest_dir.mkdir(exist_ok=True, parents=True)
+    
+    if os.name == 'nt':
+        run_command(["extrac32", "/E", "/Y", "/L", dest_dir.as_posix(), cab_path.as_posix()], verbose=verbose)
+    else:
+        run_command(["cabextract", "-d", dest_dir.as_posix(), cab_path.as_posix()], verbose=verbose)
+
+
 def collect_ubuntu_certs(verbose: bool = True) -> List[Path]:
     """从Ubuntu ca-certificates收集证书"""
     logger.info("从Ubuntu ca-certificates收集证书...")
@@ -434,13 +476,12 @@ def update_revoked_certificates(verbose: bool = True) -> None:
     revoked_fingerprints = []
     
     try:
-        # 1. 从Mozilla CCADB获取已撤销的证书
-        # Mozilla已移除的CA证书报告URL
+        # 1. 从Mozilla CCADB获取已撤销 of the certificates
         removed_ca_url = "https://ccadb.my.salesforce-sites.com/mozilla/RemovedCACertificateReport"
         
         # 下载HTML页面
         temp_html = TEMP_DIR / "mozilla_removed_ca_list.html"
-        run_command(["wget", "-O", temp_html.as_posix(), removed_ca_url], verbose=verbose)
+        download_file(removed_ca_url, temp_html, verbose=verbose)
         
         # 解析HTML获取已撤销证书的SHA-256指纹（第9列）
         with open(temp_html, 'r', encoding='utf-8') as f:
@@ -477,100 +518,73 @@ def update_revoked_certificates(verbose: bool = True) -> None:
                 cab_file = TEMP_DIR / "windows_untrusted.cab"
                 extract_dir = TEMP_DIR / "windows_untrusted"
                 
-                if extract_dir.exists():
-                    shutil.rmtree(extract_dir)
-                extract_dir.mkdir(exist_ok=True, parents=True)
-                
                 # 下载并解压CAB文件
-                run_command(["wget", "-O", cab_file.as_posix(), windows_untrusted_url], verbose=verbose)
-                run_command(["cabextract", "-d", extract_dir.as_posix(), cab_file.as_posix()], verbose=verbose)
-                
-                # 查找STL文件
-                stl_files = list(extract_dir.glob("*.stl"))
-                if stl_files:
-                    stl_file_path = stl_files[0]
-                    logger.info(f"从CAB文件中提取到STL文件: {stl_file_path}")
-            
-            # 如果找到了STL文件，使用openssl处理它
-            if stl_file_path:
-                # 创建临时目录用于存储提取的证书
-                temp_certs_dir = TEMP_DIR / "windows_revoked_certs"
-                if temp_certs_dir.exists():
-                    shutil.rmtree(temp_certs_dir)
-                temp_certs_dir.mkdir(exist_ok=True, parents=True)
-                
-                # 使用openssl提取证书
-                temp_pem = temp_certs_dir / "all_certs.pem"
-                run_command([
-                    "openssl", "pkcs7", "-in", stl_file_path.as_posix(),
-                    "-inform", "DER", "-print_certs", "-out", temp_pem.as_posix()
-                ], verbose=verbose)
-                
-                # 对每个证书进行处理
-                with open(temp_pem, 'r', encoding='utf-8') as f:
-                    cert_content = f.read()
-                
-                # 分割成单独的证书
-                import re
-                cert_pattern = re.compile(r'-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----', re.DOTALL)
-                certs = cert_pattern.findall(cert_content)
-                
-                logger.info(f"从STL文件中提取到 {len(certs)} 个证书")
-                
-                # 处理每个证书，提取SHA-1和SHA-256指纹
-                for i, cert in enumerate(certs):
-                    cert_file = temp_certs_dir / f"cert_{i}.pem"
-                    with open(cert_file, 'w', encoding='utf-8') as f:
-                        f.write(cert)
+                if download_file(windows_untrusted_url, cab_file, verbose=verbose):
+                    extract_cab(cab_file, extract_dir, verbose=verbose)
                     
-                    try:
-                        # 获取SHA-1指纹
-                        sha1_output = run_command([
-                            "openssl", "x509", "-in", cert_file.as_posix(),
-                            "-noout", "-fingerprint", "-sha1"
-                        ], verbose=False)
-                        
-                        if "SHA1 Fingerprint=" in sha1_output:
-                            sha1_line = next((l for l in sha1_output.split("\n") if "SHA1 Fingerprint=" in l), "")
-                            sha1_fp = sha1_line.split("=")[1].strip().replace(":", "").lower()
-                            if sha1_fp and len(sha1_fp) == 40:
-                                revoked_fingerprints.append(("sha1", sha1_fp))
-                        
-                        # 获取SHA-256指纹
-                        sha256_output = run_command([
-                            "openssl", "x509", "-in", cert_file.as_posix(),
-                            "-noout", "-fingerprint", "-sha256"
-                        ], verbose=False)
-                        
-                        if "SHA256 Fingerprint=" in sha256_output:
-                            sha256_line = next((l for l in sha256_output.split("\n") if "SHA256 Fingerprint=" in l), "")
-                            sha256_fp = sha256_line.split("=")[1].strip().replace(":", "").lower()
-                            if sha256_fp and len(sha256_fp) == 64:
-                                revoked_fingerprints.append(("sha256", sha256_fp))
-                                
-                    except Exception as e:
-                        logger.warning(f"处理STL中的证书 {i} 时出错: {e}")
-                
-                # 处理证书主体中可能包含的CRL数据
+                    # 查找STL文件
+                    stl_files = list(extract_dir.glob("*.stl"))
+                    if stl_files:
+                        stl_file_path = stl_files[0]
+                        logger.info(f"从CAB文件中提取到STL文件: {stl_file_path}")
+            
+            # 如果找到了STL文件，使用 asn1crypto 处理它
+            if stl_file_path:
                 try:
-                    # 提取证书中的CRL信息
-                    for cert_file in temp_certs_dir.glob("*.pem"):
-                        crl_text = run_command([
-                            "openssl", "x509", "-in", cert_file.as_posix(),
-                            "-noout", "-text"
-                        ], verbose=False)
+                    from asn1crypto import cms, core
+                    with open(stl_file_path, "rb") as f:
+                        data = f.read()
+                    
+                    content_info = cms.ContentInfo.load(data)
+                    signed_data = content_info['content']
+                    encap_content_info = signed_data['encap_content_info']
+                    ctl_content = encap_content_info['content'].parsed
+                    
+                    # Force child parsing
+                    len(ctl_content)
+                    
+                    class TrustedSubject(core.Sequence):
+                        _fields = [
+                            ('subject_identifier', core.OctetString),
+                            ('subject_attributes', core.SetOf, {'optional': True}),
+                        ]
                         
-                        # 使用正则表达式查找CRL中可能的SHA-1指纹
-                        sha1_pattern = re.compile(r'[0-9a-f]{40}', re.IGNORECASE)
-                        for match in sha1_pattern.finditer(crl_text):
-                            revoked_fingerprints.append(("sha1", match.group(0).lower()))
-                        
-                        # 使用正则表达式查找CRL中可能的SHA-256指纹
-                        sha256_pattern = re.compile(r'[0-9a-f]{64}', re.IGNORECASE)
-                        for match in sha256_pattern.finditer(crl_text):
-                            revoked_fingerprints.append(("sha256", match.group(0).lower()))
+                    class TrustedSubjects(core.SequenceOf):
+                        _child_spec = TrustedSubject
+
+                    trusted_subjects_node = None
+                    for child in reversed(ctl_content.children):
+                        if child[2] == 16:
+                            try:
+                                der_bytes = child[3] + child[4] + child[5]
+                                subjects = TrustedSubjects.load(der_bytes)
+                                if len(subjects) > 0 and isinstance(subjects[0]['subject_identifier'], core.OctetString):
+                                    trusted_subjects_node = child
+                                    break
+                            except Exception:
+                                continue
+                                
+                    if trusted_subjects_node:
+                        der_bytes = trusted_subjects_node[3] + trusted_subjects_node[4] + trusted_subjects_node[5]
+                        subjects = TrustedSubjects.load(der_bytes)
+                        logger.info(f"从 Windows STL 中解析到 {len(subjects)} 个已撤销的证书项")
+                        for s in subjects:
+                            raw_hash = s['subject_identifier'].native
+                            if len(raw_hash) == 16:
+                                revoked_fingerprints.append(("md5", raw_hash.hex().lower()))
+                            elif len(raw_hash) == 20:
+                                revoked_fingerprints.append(("sha1", raw_hash.hex().lower()))
+                            elif len(raw_hash) == 48:
+                                md5_part = raw_hash[:16].hex().lower()
+                                sha256_part = raw_hash[16:].hex().lower()
+                                revoked_fingerprints.append(("md5", md5_part))
+                                revoked_fingerprints.append(("sha256", sha256_part))
+                            else:
+                                revoked_fingerprints.append(("sha1", raw_hash.hex().lower()))
+                    else:
+                        logger.warning("在 Windows STL 中未找到 trustedSubjects")
                 except Exception as e:
-                    logger.warning(f"提取CRL信息时出错: {e}")
+                    logger.warning(f"解析 Windows STL 时出错: {e}")
             
             logger.info(f"从Windows CRL找到可能的指纹，现在共有 {len(revoked_fingerprints)} 个指纹")
         except Exception as e:
@@ -633,98 +647,153 @@ def collect_windows_certs(verbose: bool = True) -> List[Path]:
     
     try:
         # 安装必要的工具
-        run_command(["apt-get", "install", "-y", "wget", "cabextract", "openssl"], verbose=verbose)
-        
+        try:
+            run_command(["apt-get", "install", "-y", "wget", "cabextract", "openssl"], verbose=verbose)
+        except Exception as e:
+            logger.warning(f"安装系统依赖失败 (可能不是 Ubuntu/Debian 环境): {e}")
+
         # 下载Windows根证书计划
         authroot_url = "http://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab"
         authroot_cab = TEMP_DIR / "authroot.cab"
-        run_command(["wget", "-O", authroot_cab.as_posix(), authroot_url], verbose=verbose)
+        if not download_file(authroot_url, authroot_cab, verbose=verbose):
+            logger.error("下载 authrootstl.cab 失败")
+            return []
         
         # 解压cab文件到临时目录
         extract_dir = TEMP_DIR / "authroot-extract"
-        if extract_dir.exists():
-            shutil.rmtree(extract_dir)
-        extract_dir.mkdir(exist_ok=True, parents=True)
+        extract_cab(authroot_cab, extract_dir, verbose=verbose)
         
-        run_command(["cabextract", "-d", extract_dir.as_posix(), authroot_cab.as_posix()], verbose=verbose)
-        
-        # 使用openssl pkcs7命令提取STL中的证书
+        # 提取 STL 中的证书 hashes
         stl_file = extract_dir / "authroot.stl"
-        output_file = source_dir / "windows-root.crt"
+        hashes = []
         if stl_file.exists():
-            run_command([
-                "openssl", "pkcs7", "-in", stl_file.as_posix(),
-                "-inform", "DER", "-print_certs", "-out", output_file.as_posix()
-            ], verbose=verbose)
+            try:
+                from asn1crypto import cms, core
+                with open(stl_file, "rb") as f:
+                    data = f.read()
+                
+                content_info = cms.ContentInfo.load(data)
+                signed_data = content_info['content']
+                encap_content_info = signed_data['encap_content_info']
+                ctl_content = encap_content_info['content'].parsed
+                
+                # Force parsing of children
+                len(ctl_content)
+                
+                class TrustedSubject(core.Sequence):
+                    _fields = [
+                        ('subject_identifier', core.OctetString),
+                        ('subject_attributes', core.SetOf, {'optional': True}),
+                    ]
+                    
+                class TrustedSubjects(core.SequenceOf):
+                    _child_spec = TrustedSubject
+
+                trusted_subjects_node = None
+                for child in reversed(ctl_content.children):
+                    if child[2] == 16:
+                        try:
+                            der_bytes = child[3] + child[4] + child[5]
+                            subjects = TrustedSubjects.load(der_bytes)
+                            if len(subjects) > 0 and isinstance(subjects[0]['subject_identifier'], core.OctetString):
+                                trusted_subjects_node = child
+                                break
+                        except Exception:
+                            continue
+                
+                if trusted_subjects_node:
+                    der_bytes = trusted_subjects_node[3] + trusted_subjects_node[4] + trusted_subjects_node[5]
+                    subjects = TrustedSubjects.load(der_bytes)
+                    for s in subjects:
+                        sha1_hex = s['subject_identifier'].native.hex().lower()
+                        hashes.append(sha1_hex)
+                    logger.info(f"从 Windows STL 中成功解析到 {len(hashes)} 个根证书哈希")
+                else:
+                    logger.error("在 Windows STL 中未找到 trustedSubjects 字段")
+            except Exception as e:
+                logger.error(f"解析 Windows STL 时出错: {e}")
         
+        # 并行下载并转换证书
+        if hashes:
+            import concurrent.futures
+            from cryptography import x509
+            from cryptography.hazmat.primitives import serialization
+            
+            # 使用 ThreadPoolExecutor 并行下载
+            max_workers = 30
+            logger.info(f"使用 {max_workers} 个线程并行下载 {len(hashes)} 个证书...")
+            
+            def download_and_convert(sha1_hash: str, index: int) -> bool:
+                url = f"http://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/{sha1_hash}.crt"
+                der_path = TEMP_DIR / f"{sha1_hash}.der"
+                output_file = source_dir / f"windows-stl-{index:03d}.crt"
+                
+                if download_file(url, der_path, verbose=False):
+                    try:
+                        with open(der_path, "rb") as f:
+                            der_bytes = f.read()
+                        
+                        # 转换 DER 为 PEM
+                        cert = x509.load_der_x509_certificate(der_bytes)
+                        pem_bytes = cert.public_bytes(serialization.Encoding.PEM)
+                        
+                        with open(output_file, "wb") as f:
+                            f.write(pem_bytes)
+                        
+                        if der_path.exists():
+                            der_path.unlink()
+                        return True
+                    except Exception as e:
+                        logger.warning(f"转换证书 {sha1_hash} 失败: {e}")
+                        if der_path.exists():
+                            der_path.unlink()
+                return False
+
+            success_count = 0
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_hash = {
+                    executor.submit(download_and_convert, sha1, idx): sha1 
+                    for idx, sha1 in enumerate(hashes)
+                }
+                for future in concurrent.futures.as_completed(future_to_hash):
+                    sha1 = future_to_hash[future]
+                    try:
+                        if future.result():
+                            success_count += 1
+                    except Exception as e:
+                        logger.warning(f"下载/转换任务异常 ({sha1}): {e}")
+            logger.info(f"下载完成：成功获取并转换了 {success_count}/{len(hashes)} 个 Windows 根证书")
+
         # 下载补充的根证书
         supplemental_urls = [
             "https://www.microsoft.com/pki/certs/MicrosoftRootCert.crt",
             "https://www.microsoft.com/pki/mscorp/msitwww2.crt"
         ]
         
-        cert_index = 1  # 从1开始，因为0已经被使用
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        
+        cert_index = len(hashes) + 1
         for url in supplemental_urls:
             try:
                 cert_file = TEMP_DIR / f"windows-supp-{cert_index}.crt"
-                output_file = source_dir / f"windows-{cert_index:03d}.crt"
+                output_file = source_dir / f"windows-supp-{cert_index:03d}.crt"
                 
-                run_command(["wget", "-O", cert_file.as_posix(), url], verbose=verbose)
-                run_command([
-                    "openssl", "x509", "-inform", "DER", "-in", cert_file.as_posix(),
-                    "-out", output_file.as_posix()
-                ], verbose=verbose)
-                cert_index += 1
+                if download_file(url, cert_file, verbose=verbose):
+                    with open(cert_file, "rb") as f:
+                        der_bytes = f.read()
+                    
+                    # 转换 DER 为 PEM
+                    cert = x509.load_der_x509_certificate(der_bytes)
+                    pem_bytes = cert.public_bytes(serialization.Encoding.PEM)
+                    
+                    with open(output_file, "wb") as f:
+                        f.write(pem_bytes)
+                    cert_index += 1
+                    logger.info(f"成功收集补充证书: {url}")
             except Exception as e:
                 logger.warning(f"处理补充证书 {url} 时出错: {e}")
                 continue
-        
-        # 如果以上方法收集的证书太少，尝试从其他来源获取Windows证书
-        if cert_index < 3:  # 如果收集到的证书少于3个
-            logger.info("从备用来源收集Windows证书...")
-            backup_url = "http://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/disallowedcertchainlist.cab"
-            backup_cab = TEMP_DIR / "backup.cab"
-            run_command(["wget", "-O", backup_cab.as_posix(), backup_url], verbose=verbose)
-            
-            # 解压cab文件到临时目录
-            extract_dir = TEMP_DIR / "backup-extract"
-            if extract_dir.exists():
-                shutil.rmtree(extract_dir)
-            extract_dir.mkdir(exist_ok=True, parents=True)
-            
-            run_command(["cabextract", "-d", extract_dir.as_posix(), backup_cab.as_posix()], verbose=verbose)
-            
-            # 寻找证书文件并转换
-            cert_files = list(extract_dir.glob("*.cer")) + \
-                        list(extract_dir.glob("*.crt")) + \
-                        list(extract_dir.glob("*.der"))
-                        
-            for cert_file in cert_files:
-                output_file = source_dir / f"windows-{cert_index:03d}.crt"
-                try:
-                    # 尝试DER格式转换
-                    run_command([
-                        "openssl", "x509", "-inform", "DER", "-in", cert_file.as_posix(),
-                        "-out", output_file.as_posix()
-                    ], verbose=verbose)
-                    cert_index += 1
-                except Exception:
-                    # 如果DER格式失败，尝试复制PEM格式
-                    try:
-                        shutil.copy(cert_file, output_file)
-                        # 验证复制的文件是否为有效的PEM证书
-                        if os.path.exists(output_file):
-                            try:
-                                run_command([
-                                    "openssl", "x509", "-in", output_file.as_posix(),
-                                    "-noout", "-text"
-                                ], verbose=False)  # 使用安静模式验证
-                                cert_index += 1
-                            except Exception:
-                                # 如果验证失败，删除无效的证书文件
-                                os.unlink(output_file)
-                    except Exception as e:
-                        logger.warning(f"处理证书 {cert_file.name} 时出错: {e}")
         
         return list(source_dir.glob("*.crt"))
     
@@ -988,6 +1057,19 @@ def get_cert_info(cert_path: Path, verbose: bool = True) -> Dict:
             logger.debug(f"获取SHA-256指纹时出错: {e}")
             # 如果SHA-256获取失败，继续使用SHA-1
         
+        # 尝试获取MD5指纹
+        try:
+            md5_output = run_command([
+                "openssl", "x509", "-in", cert_path.as_posix(),
+                "-noout", "-fingerprint", "-md5"
+            ], verbose=False)
+            
+            if "MD5 Fingerprint=" in md5_output:
+                md5_line = next((l for l in md5_output.split("\n") if "MD5 Fingerprint=" in l), "")
+                info["md5_fingerprint"] = md5_line.split("=")[1].strip().replace(":", "").lower()
+        except Exception as e:
+            logger.debug(f"获取MD5指纹时出错: {e}")
+        
         return info
     
     except Exception as e:
@@ -1014,14 +1096,15 @@ def is_certificate_revoked(cert_info: Dict) -> bool:
         logger.debug(f"黑名单文件不存在: {BLACKLIST_FILE}")
         return False
     
-    # 获取证书的SHA-1和SHA-256指纹
+    # 获取证书的SHA-1、SHA-256和MD5指纹
     sha1_fingerprint = cert_info.get("fingerprint", "").lower()
     sha256_fingerprint = cert_info.get("sha256_fingerprint", "").lower()
+    md5_fingerprint = cert_info.get("md5_fingerprint", "").lower()
     
-    if not sha1_fingerprint and not sha256_fingerprint:
+    if not sha1_fingerprint and not sha256_fingerprint and not md5_fingerprint:
         return False
     
-    logger.debug(f"检查证书指纹是否在黑名单中 - SHA-1: {sha1_fingerprint}, SHA-256: {sha256_fingerprint}")
+    logger.debug(f"检查证书指纹是否在黑名单中 - SHA-1: {sha1_fingerprint}, SHA-256: {sha256_fingerprint}, MD5: {md5_fingerprint}")
     
     # 从黑名单文件中读取和解析指纹
     with open(BLACKLIST_FILE, 'r') as f:
@@ -1063,6 +1146,18 @@ def is_certificate_revoked(cert_info: Dict) -> bool:
         # 检查不带类型的格式（向后兼容）
         if sha256_fingerprint in blacklist_fps:
             logger.info(f"证书SHA-256指纹在黑名单中（无类型格式）: {sha256_fingerprint}")
+            return True
+            
+    # 检查MD5指纹
+    if md5_fingerprint:
+        # 检查带类型的格式
+        if ("md5", md5_fingerprint) in blacklist_with_type:
+            logger.info(f"证书MD5指纹在黑名单中（带类型格式）: {md5_fingerprint}")
+            return True
+        
+        # 检查不带类型的格式（向后兼容）
+        if md5_fingerprint in blacklist_fps:
+            logger.info(f"证书MD5指纹在黑名单中（无类型格式）: {md5_fingerprint}")
             return True
     
     return False
@@ -1274,14 +1369,53 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
     sorted_certs.sort(key=lambda x: x[1].lower())
     
     # 生成HTML
-    for cert_name, cert_display_name, issuer, valid_until in sorted_certs:
+    for idx, (cert_name, cert_display_name, issuer, valid_until) in enumerate(sorted_certs):
+        cert_id = f"cert_{idx}"
         cert_list_html.append(f"""
-        <tr>
-          <td><span class="cert-name">{cert_display_name}</span></td>
-          <td><span class="issuer">{issuer}</span></td>
-          <td><span class="valid-until">{valid_until}</span></td>
-          <td><a href="certs/{cert_name}.crt" class="download-link"><button class="download-button"><img src="assets/download@32x32.png" alt="下载" width="16" height="16" title="下载 {cert_name}.crt"></button></a></td>
-        </tr>
+        <div class="ios-list-item-container" id="container_{cert_id}" data-name="{cert_display_name}" data-issuer="{issuer}" data-valid="{valid_until}">
+          <a href="certs/{cert_name}.crt" class="ios-list-item-link" onclick="return handleItemClick(event, '{cert_id}')">
+            <div class="ios-list-item">
+              <img class="ios-list-item-icon" src="assets/settings@96x96.png" width="30" height="30" alt="">
+              <div class="ios-list-item-text">
+                <div class="ios-list-item-title">{cert_display_name}</div>
+                <div class="ios-list-item-subtitle">{issuer}</div>
+              </div>
+              <div class="ios-list-arrow"></div>
+            </div>
+          </a>
+          <div class="cert-card" id="card_{cert_id}" style="display: none;">
+            <div class="cert-card-row1">
+              <div class="cert-card-col-left">
+                <img class="cert-card-img" src="assets/settings@128x128.png" width="128" height="128" alt="">
+              </div>
+              <div class="cert-card-col-right">
+                <h2 class="cert-card-title">{cert_display_name}</h2>
+                <p class="cert-card-subtitle">{issuer}</p>
+                <div class="cert-card-status">
+                  <span class="trusted-icon">&#10003;</span>
+                  <span class="trusted-text">可信</span>
+                </div>
+                <a href="certs/{cert_name}.crt" class="cert-card-btn-link" target="_blank">
+                  <button type="button" class="cert-card-btn" id="btn_{cert_id}">下载</button>
+                </a>
+              </div>
+            </div>
+            <div class="cert-card-row2">
+              <div class="cert-metadata-row">
+                <span class="meta-label">包含</span>
+                <span class="meta-value">根证书</span>
+              </div>
+              <div class="cert-metadata-row">
+                <span class="meta-label">有效期至</span>
+                <span class="meta-value">{valid_until}</span>
+              </div>
+              <div class="cert-metadata-row">
+                <span class="meta-label">文件名</span>
+                <span class="meta-value">{cert_name}.crt</span>
+              </div>
+            </div>
+          </div>
+        </div>
         """)
     
     # 替换模板中的占位符

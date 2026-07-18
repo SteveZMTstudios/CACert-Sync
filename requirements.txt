@@ -5,3 +5,4 @@ requests>=2.25.0
 lxml>=4.9.0
 pyopenssl>=23.0.0
 cryptography>=38.0.0
+asn1crypto>=1.5.0

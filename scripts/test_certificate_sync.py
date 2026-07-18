@@ -8,6 +8,7 @@
 import sys
 import argparse
 import tempfile
+import shutil
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -72,6 +73,11 @@ class SyncCertificatesOfflineTests(unittest.TestCase):
         self.certs_dir.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
+        # Copy the real templates folder to the temp root_dir so we use the real template files in tests
+        real_templates = Path(sync.__file__).parent.parent / "templates"
+        if real_templates.exists():
+            shutil.copytree(real_templates, self.root_dir / "templates")
+
         self.patches = [
             mock.patch.object(sync, "ROOT_DIR", self.root_dir),
             mock.patch.object(sync, "CERTS_DIR", self.certs_dir),
@@ -131,15 +137,6 @@ class SyncCertificatesOfflineTests(unittest.TestCase):
         self.assertNotIn(" ", normalized_str)
 
     def test_generate_html_page_replaces_placeholders_and_assets_path(self) -> None:
-        template = """<html>
-<head><link rel=\"stylesheet\" href=\"templates/assets/ios6-settings.css\"></head>
-<body>
-<div>{{LAST_UPDATED}}</div>
-<div>{{CERTIFICATE_COUNT}}</div>
-<table>{{CERTIFICATE_LIST_REPLACED}}</table>
-</body>
-</html>"""
-        _write_text(self.root_dir / "templates" / "index.html", template)
 
         cert_info_map = {
             "z_cert": {
