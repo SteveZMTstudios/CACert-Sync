@@ -2,6 +2,16 @@
   "devDependencies": {
     "@babel/cli": "^8.0.4",
     "@babel/core": "^8.0.1",
-    "@babel/preset-env": "^8.0.2"
+    "@babel/preset-env": "^8.0.2",
+    "autoprefixer": "^10.5.4"
+  },
+  "dependencies": {
+    "postcss": "^8.5.19",
+    "postcss-cli": "^11.0.1"
+  },
+  "scripts": {
+    "css": "postcss templates/assets/ios6-settings.css -o templates/assets/ios6-settings.css --no-map",
+    "js": "babel templates/assets/ios6-settings.src.js -o templates/assets/ios6-settings.js && babel templates/assets/ios6-lang.src.js -o templates/assets/ios6-lang.js",
+    "build": "npm run js && npm run css"
   }
 }

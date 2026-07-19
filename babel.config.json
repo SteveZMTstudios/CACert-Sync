@@ -7,8 +7,8 @@
           "browsers": [
             "safari >= 5",
             "iOS >= 5",
-            "Android >= 2.0",
-            "ie >= 5"
+            "Android >= 4.0",
+            "ie >= 9"
           ]
         },
         "modules": false

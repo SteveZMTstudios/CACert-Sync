@@ -43,6 +43,8 @@ else
     pip install beautifulsoup4 requests certifi
 fi
 
+npm ci
+
 # 设置环境
 echo -e "${BLUE}设置环境...${NC}"
 python scripts/cacert-cli.py setup --force

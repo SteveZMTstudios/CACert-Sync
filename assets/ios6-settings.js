@@ -18,7 +18,8 @@ function searchTable() {
       var name = item.getAttribute('data-name') || '';
       var issuer = item.getAttribute('data-issuer') || '';
       var valid = item.getAttribute('data-valid') || '';
-      var textToSearch = (name + ' ' + issuer + ' ' + valid).toUpperCase();
+      var extra = item.getAttribute('data-extra') || '';
+      var textToSearch = (name + ' ' + issuer + ' ' + valid + ' ' + extra).toUpperCase();
       if (textToSearch.indexOf(filter) > -1) {
         item.style.display = '';
       } else {
@@ -84,6 +85,125 @@ function filterTableByRoot(rootCN, rootOrg) {
   } catch (err) {}
   return hasMatch;
 }
+function resolveIntermediateToRoot(cn, org) {
+  var cnLower = cn ? cn.toLowerCase().replace(/^\s+|\s+$/g, '') : '';
+  var orgLower = org ? org.toLowerCase().replace(/^\s+|\s+$/g, '') : '';
+
+  // Let's Encrypt mapping
+  if (cnLower === 'r3' || cnLower === 'r4' || cnLower === 'e1' || cnLower === 'r10' || cnLower === 'r11') {
+    return {
+      rootCN: 'ISRG Root X1',
+      rootOrg: 'Internet Security Research Group'
+    };
+  }
+  if (cnLower === 'e2' || cnLower === 'r12' || cnLower === 'e12') {
+    return {
+      rootCN: 'ISRG Root X2',
+      rootOrg: 'Internet Security Research Group'
+    };
+  }
+
+  // Google Trust Services (GTS) mapping
+  if (cnLower.indexOf('gts ca ') === 0 || cnLower.indexOf('gts root ') === 0 || cnLower.indexOf('gts ') === 0) {
+    if (cnLower.indexOf('1c3') > -1 || cnLower.indexOf('1d4') > -1 || cnLower.indexOf('1o1') > -1 || cnLower.indexOf('r1') > -1) {
+      return {
+        rootCN: 'GTS Root R1',
+        rootOrg: 'Google Trust Services LLC'
+      };
+    }
+    if (cnLower.indexOf('2c3') > -1 || cnLower.indexOf('2d4') > -1 || cnLower.indexOf('r2') > -1) {
+      return {
+        rootCN: 'GTS Root R2',
+        rootOrg: 'Google Trust Services LLC'
+      };
+    }
+    if (cnLower.indexOf('3c3') > -1 || cnLower.indexOf('3d4') > -1 || cnLower.indexOf('r3') > -1) {
+      return {
+        rootCN: 'GTS Root R3',
+        rootOrg: 'Google Trust Services LLC'
+      };
+    }
+    if (cnLower.indexOf('4c3') > -1 || cnLower.indexOf('4d4') > -1 || cnLower.indexOf('r4') > -1) {
+      return {
+        rootCN: 'GTS Root R4',
+        rootOrg: 'Google Trust Services LLC'
+      };
+    }
+  }
+
+  // DigiCert mapping
+  if (orgLower.indexOf('digicert') > -1) {
+    if (cnLower.indexOf('assured id') > -1) {
+      return {
+        rootCN: 'DigiCert Assured ID Root CA',
+        rootOrg: 'DigiCert Inc'
+      };
+    }
+    if (cnLower.indexOf('global root g2') > -1) {
+      return {
+        rootCN: 'DigiCert Global Root G2',
+        rootOrg: 'DigiCert Inc'
+      };
+    }
+    if (cnLower.indexOf('global root ca') > -1 || cnLower.indexOf('tls rsa') > -1 || cnLower.indexOf('sha2') > -1) {
+      return {
+        rootCN: 'DigiCert Global Root CA',
+        rootOrg: 'DigiCert Inc'
+      };
+    }
+  }
+
+  // Sectigo / Comodo mapping
+  if (orgLower.indexOf('sectigo') > -1 || orgLower.indexOf('comodo') > -1) {
+    if (cnLower.indexOf('rsa') > -1) {
+      return {
+        rootCN: 'USERTrust RSA Certification Authority',
+        rootOrg: 'The USERTRUST Network'
+      };
+    }
+    if (cnLower.indexOf('ecc') > -1) {
+      return {
+        rootCN: 'USERTrust ECC Certification Authority',
+        rootOrg: 'The USERTRUST Network'
+      };
+    }
+  }
+
+  // GlobalSign mapping
+  if (orgLower.indexOf('globalsign') > -1) {
+    return {
+      rootCN: 'GlobalSign Root CA',
+      rootOrg: 'GlobalSign'
+    };
+  }
+  return null;
+}
+function parseCrtShDate(dateStr) {
+  if (!dateStr) {
+    return null;
+  }
+  try {
+    var cleanStr = dateStr.replace('T', ' ').replace(/\.\d+/, '');
+    var parts = cleanStr.split(' ');
+    if (!parts[0]) {
+      return null;
+    }
+    var dateParts = parts[0].split('-');
+    var timeParts = parts[1] ? parts[1].split(':') : [0, 0, 0];
+    var year = parseInt(dateParts[0], 10);
+    var month = parseInt(dateParts[1], 10) - 1;
+    var day = parseInt(dateParts[2], 10);
+    var hour = parseInt(timeParts[0], 10);
+    var minute = parseInt(timeParts[1], 10);
+    var second = parseInt(timeParts[2], 10);
+    if (isNaN(year) || isNaN(month) || isNaN(day)) {
+      return null;
+    }
+    return new Date(Date.UTC(year, month, day, hour, minute, second));
+  } catch (e) {
+    return null;
+  }
+}
 function normalizeIssuerCandidates(issuer) {
   if (!issuer) {
     return [];
@@ -104,9 +224,61 @@ function normalizeIssuerCandidates(issuer) {
   if (cleaned) {
     candidates.push(cleaned);
   }
+  var blacklist = {
+    'public': true,
+    'private': true,
+    'trust': true,
+    'services': true,
+    'service': true,
+    'ca': true,
+    'root': true,
+    'class': true,
+    'limited': true,
+    'ltd': true,
+    'authority': true,
+    'certification': true,
+    'secure': true,
+    'server': true,
+    'global': true,
+    'primary': true,
+    'security': true,
+    'group': true,
+    'corporation': true,
+    'corp': true,
+    'network': true,
+    'association': true,
+    'system': true,
+    'systems': true,
+    'information': true,
+    'internet': true,
+    'assurance': true,
+    'assured': true,
+    'identity': true,
+    'validation': true,
+    'domain': true,
+    'organization': true,
+    'client': true,
+    'authentication': true,
+    'software': true,
+    'solutions': true,
+    'solution': true,
+    'defense': true,
+    'defence': true,
+    'government': true,
+    'national': true,
+    'state': true,
+    'federal': true
+  };
   for (i = 0; i < parts.length; i++) {
-    candidates.push(parts.slice(i).join(' '));
-    candidates.push(parts[i]);
+    var subphrase = parts.slice(i).join(' ');
+    var subphraseLower = subphrase.toLowerCase();
+    if (!blacklist[subphraseLower] && subphraseLower.length > 2) {
+      candidates.push(subphrase);
+    }
+    var partLower = parts[i].toLowerCase();
+    if (!blacklist[partLower] && partLower.length > 2) {
+      candidates.push(parts[i]);
+    }
   }
   for (i = 0; i < candidates.length && output.length < 8; i++) {
     var item = candidates[i];
@@ -131,6 +303,11 @@ function tryMatchByIssuerCandidates(cn, org) {
   var candidates = [];
   var i;
   var key;
+  var resolved = resolveIntermediateToRoot(cn, org);
+  if (resolved) {
+    cn = resolved.rootCN;
+    org = resolved.rootOrg;
+  }
   if (cn) {
     candidates = candidates.concat(normalizeIssuerCandidates(cn));
   }
@@ -199,6 +376,44 @@ function fetchJsonWithCorsFallback(url) {
     tryProxy(0);
   });
 }
+function extractLatestActiveIssuer(payload) {
+  if (!payload || typeof payload.length === 'undefined' || payload.length === 0) {
+    return null;
+  }
+  var now = new Date();
+  var activeCerts = [];
+  var i;
+  for (i = 0; i < payload.length; i++) {
+    var cert = payload[i];
+    if (cert.not_after) {
+      var notAfterDate = parseCrtShDate(cert.not_after);
+      if (notAfterDate && notAfterDate > now) {
+        activeCerts.push(cert);
+      }
+    }
+  }
+
+  // Sort active certificates by not_before descending (newest first)
+  if (activeCerts.length > 0) {
+    activeCerts.sort(function (a, b) {
+      var dateA = a.not_before ? parseCrtShDate(a.not_before) : null;
+      var dateB = b.not_before ? parseCrtShDate(b.not_before) : null;
+      var timeA = dateA ? dateA.getTime() : 0;
+      var timeB = dateB ? dateB.getTime() : 0;
+      return timeB - timeA;
+    });
+    payload = activeCerts;
+  }
+  var latestCert = payload[0];
+  if (!latestCert) {
+    return null;
+  }
+  var issuerName = latestCert.issuer_name || '';
+  return {
+    rootCN: parseDNField(issuerName, 'CN'),
+    rootOrg: parseDNField(issuerName, 'O')
+  };
+}
 function callCrtSh(domain) {
   return new Promise(function (resolve, reject) {
     try {
@@ -218,28 +433,22 @@ function callCrtSh(domain) {
         }
         var endpoint = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
         return fetchJsonWithCorsFallback(endpoint).then(function (payload) {
-          if (!payload || typeof payload.length === 'undefined' || payload.length === 0) {
-            throw new Error('crt.sh 未返回证书数据');
+          var result = extractLatestActiveIssuer(payload);
+          if (result) {
+            resolve(result);
+          } else {
+            throw new Error('未在 crt.sh 中找到有效的证书数据');
           }
-          var latestCert = payload[0];
-          var issuerName = latestCert.issuer_name || '';
-          resolve({
-            rootCN: parseDNField(issuerName, 'CN'),
-            rootOrg: parseDNField(issuerName, 'O')
-          });
         });
       })["catch"](function () {
         var endpointFallback = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
         fetchJsonWithCorsFallback(endpointFallback).then(function (payload2) {
-          if (!payload2 || typeof payload2.length === 'undefined' || payload2.length === 0) {
-            throw new Error('crt.sh 未返回证书数据');
+          var result2 = extractLatestActiveIssuer(payload2);
+          if (result2) {
+            resolve(result2);
+          } else {
+            throw new Error('未在 crt.sh 中找到有效的证书数据');
           }
-          var latestCert2 = payload2[0];
-          var issuerName2 = latestCert2.issuer_name || '';
-          resolve({
-            rootCN: parseDNField(issuerName2, 'CN'),
-            rootOrg: parseDNField(issuerName2, 'O')
-          });
         })["catch"](function (err2) {
           reject(err2);
         });
@@ -247,15 +456,12 @@ function callCrtSh(domain) {
     } catch (e) {
       var endpointDirect = 'https://crt.sh/?q=' + encodeURIComponent(domain) + '&output=json';
       fetchJsonWithCorsFallback(endpointDirect).then(function (payload3) {
-        if (!payload3 || typeof payload3.length === 'undefined' || payload3.length === 0) {
-          throw new Error('crt.sh 未返回证书数据');
+        var result3 = extractLatestActiveIssuer(payload3);
+        if (result3) {
+          resolve(result3);
+        } else {
+          throw new Error('未在 crt.sh 中找到有效的证书数据');
         }
-        var latestCert3 = payload3[0];
-        var issuerName3 = latestCert3.issuer_name || '';
-        resolve({
-          rootCN: parseDNField(issuerName3, 'CN'),
-          rootOrg: parseDNField(issuerName3, 'O')
-        });
       })["catch"](function (err3) {
         reject(err3);
       });
@@ -472,6 +678,36 @@ function updateDownloadButtons() {
   for (i = 0; i < buttons.length; i++) {
     buttons[i].textContent = isMobile ? '安装' : '下载';
   }
+}
+function toggleMoreDetails(certId) {
+  var content = document.getElementById('more_content_' + certId);
+  var toggleLink = document.getElementById('more_toggle_link_' + certId);
+  if (!content) {
+    return;
+  }
+  var isHidden = content.style.display === 'none';
+  content.style.display = isHidden ? '' : 'none';
+  if (toggleLink) {
+    if (isHidden) {
+      if (toggleLink.className.indexOf('expanded') === -1) {
+        toggleLink.className += ' expanded';
+      }
+    } else {
+      toggleLink.className = toggleLink.className.replace(/\bexpanded\b/, '');
+    }
+  }
+  try {
+    updateRoundedCorners();
+  } catch (err) {}
+}
+function handleMoreToggleClick(event, certId) {
+  if (event && event.preventDefault) {
+    event.preventDefault();
+  } else if (window.event) {
+    window.event.returnValue = false;
+  }
+  toggleMoreDetails(certId);
+  return false;
 }
 (function () {
   if (document.body) {

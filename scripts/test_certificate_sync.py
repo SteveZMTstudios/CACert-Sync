@@ -6,6 +6,7 @@
 """
 
 import sys
+import os
 import argparse
 import tempfile
 import shutil
@@ -54,6 +55,11 @@ def build_preview_cert_info_map() -> dict:
 def generate_preview_page(preview_path: Path) -> Path:
     """生成离线页面预览文件，供人工检查页面质量。"""
     cert_info_map = build_preview_cert_info_map()
+
+    os.system("npx babel templates/assets/ios6-settings.src.js -o templates/assets/ios6-settings.js")
+    os.system("npx babel templates/assets/ios6-lang.src.js -o templates/assets/ios6-lang.js")
+    os.system("npx postcss templates/assets/ios6-settings.css -o templates/assets/ios6-settings.css --no-map")
+
     sync.sync_template_assets()
     preview_path.parent.mkdir(parents=True, exist_ok=True)
     sync.generate_html_page(cert_info_map, preview_path)

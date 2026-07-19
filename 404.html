@@ -1,15 +1,19 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html lang="zh-CN">
+
 <head>
 	<title>文件不存在 - 可信CA证书库</title>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<link rel="stylesheet" type="text/css" href="assets/ios6-settings.css">
 </head>
+
 <body class="pinstripe">
 	<div class="page-wrap">
 		<div class="ios-nav-bar">
-			<div class="ios-nav-title">可信CA证书库</div>
+			<div class="ios-nav-title" id="navTitle">可信CA证书库</div>
+			<button type="button" class="ios-nav-btn-right" id="langSwitchBtn"
+				onclick="toggleLanguage()">English</button>
 		</div>
 
 		<div class="page-content">
@@ -18,65 +22,172 @@
 					<img src="assets/certificate.png" alt="404" class="hero-icon" width="64" height="64">
 				</div>
 				<div class="hero-right">
-					<h1>文件不存在</h1>
-					<p>请求的资源未找到，可能该文件已被删除、移动或输入的 URL 有误。</p>
+					<h1 id="heroTitle">文件不存在</h1>
+					<p id="heroDesc">请求的资源未找到，可能该文件已被删除、移动或输入的 URL 有误。</p>
 				</div>
 			</div>
 
-			<div class="ios-group-header">错误信息</div>
+			<div class="ios-group-header" id="errorHeader">错误信息</div>
 			<div class="ios-group rounded">
 				<div class="ios-cell warning-cell">
-                    HTTP 404 - Not Found<br />
-					您请求的地址 <strong id="missingPath"></strong> 未在我们的服务器上检索到。<br />
-                    <span style="color: #6e5a17aa;">这便是我们所知道的全部信息。</span>
+					HTTP 404 - Not Found<br />
+					<span id="pathPrefix">您请求的地址 </span><strong id="missingPath"></strong><span id="pathSuffix">
+						未在我们的服务器上检索到。</span><br />
+					<span style="color: #6e5a17aa;" id="extraNote">这便是我们所知道的全部信息。</span>
 				</div>
 				<div class="ios-cell">
-					<a href="/" class="download-link"><button type="button" class="ios-btn">返回首页</button></a>
-                    <a href="https://github.com/SteveZMTstudios/CACert-Sync/issues/new/choose" class="download-link" target="_blank"><button type="button" class="ios-btn">报告此问题</button></a>
+					<a href="/" class="download-link"><button type="button" class="ios-btn"
+							id="btnHome">返回首页</button></a>
+					<a href="https://github.com/SteveZMTstudios/CACert-Sync/issues/new/choose" class="download-link"
+						target="_blank"><button type="button" class="ios-btn" id="btnReport">报告此问题</button></a>
 				</div>
 			</div>
 
-			<div class="ios-group-header">排查建议</div>
+			<div class="ios-group-header" id="tipsHeader">排查建议</div>
 			<div class="ios-group rounded">
-				<div class="ios-cell">
-                    · 稍后重新访问此页面。<br />
-                    · 确保输入的 URL 正确无误。<br />
-                    · 与带您到这里的人核实此页面上的地址是否正确。<br />
-                    · 使用搜索引擎搜索您正在寻找的关键字。
+				<div class="ios-cell" id="tipsList">
+					· 稍后重新访问此页面。<br />
+					· 确保输入的 URL 正确无误。<br />
+					· 与带您到这里的人核实此页面上的地址是否正确。<br />
+					· 使用搜索引擎搜索您正在寻找的关键字。
 				</div>
 			</div>
 
-			<div class="ios-footer rounded">
-该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br />
-导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br />
-页面设计版权所有 © 2026 SteveZMT <br />
+			<div class="ios-footer rounded" id="pageFooter">
+				该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br />
+				导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br />
+				页面设计版权所有 &copy; <span id="copyright-year">2026</span> SteveZMT <br />
 			</div>
 		</div>
 	</div>
 
-	<script type="text/javascript">
-	(function () {
-		var fallback = "";
-		var host = "";
-		var path = "";
+	<script type="text/javascript">/* ── Missing-path display ─────────────────────────────────── */
+		(function () {
+			var host = "",
+				path = "";
+			if (document && document.location) {
+				host = document.location.host || document.location.hostname || "";
+				path = document.location.pathname || "";
+			}
+			var value = host && path ? host + path : "";
+			if (document.getElementById) {
+				var el = document.getElementById("missingPath");
+				if (el) {
+					el.innerHTML = value;
+				}
+			}
+			var yr = document.getElementById("copyright-year");
+			if (yr) {
+				yr.innerHTML = String(new Date().getFullYear());
+			}
+		})();
 
-		if (document && document.location) {
-			host = document.location.host || document.location.hostname || "";
-			path = document.location.pathname || "";
-		}
-
-		var value = fallback;
-		if (host && path) {
-			value = host + path;
-		}
-
-		if (document.getElementById) {
-			var el = document.getElementById("missingPath");
-			if (el) {
-				el.innerHTML = value;
+		/* ── Inline i18n ──────────────────────────────────────────── */
+		var STRINGS = {
+			zh: {
+				lang: "html-lang",
+				/* not used directly */
+				navTitle: "可信CA证书库",
+				btnSwitch: "English",
+				heroTitle: "文件不存在",
+				heroDesc: "请求的资源未找到，可能该文件已被删除、移动或输入的 URL 有误。",
+				errorHeader: "错误信息",
+				pathPrefix: "您请求的地址 ",
+				pathSuffix: " 未在我们的服务器上检索到。",
+				extraNote: "这便是我们所知道的全部信息。",
+				btnHome: "返回首页",
+				btnReport: "报告此问题",
+				tipsHeader: "排查建议",
+				tipsList:
+					"· 稍后重新访问此页面。<br />· 确保输入的 URL 正确无误。<br />· 与带您到这里的人核实此页面上的地址是否正确。<br />· 使用搜索引擎搜索您正在寻找的关键字。",
+				footer:
+					'该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br />导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br />页面设计版权所有 &copy; <span id="copyright-year">{year}</span> SteveZMT'
+			},
+			en: {
+				navTitle: "Trusted CA Store",
+				btnSwitch: "简体中文",
+				heroTitle: "File Not Found",
+				heroDesc:
+					"The requested resource could not be found. The file may have been deleted, moved, or the URL entered may be incorrect.",
+				errorHeader: "Error Details",
+				pathPrefix: "The address you requested, ",
+				pathSuffix: ", was not found on our servers.",
+				extraNote: "That is all the information we have.",
+				btnHome: "Back to Home",
+				btnReport: "Report This Issue",
+				tipsHeader: "Troubleshooting Tips",
+				tipsList:
+					"· Try visiting this page again later.<br />· Make sure the URL you entered is correct.<br />· Verify with whoever directed you here that the address is right.<br />· Use a search engine to look up what you were looking for.",
+				footer:
+					'This project only aggregates and stores publicly available CA certificates and makes no guarantees regarding their currency or authenticity.<br />Importing CA certificates of unknown origin may expose your device to risks, including but not limited to network traffic interception.<br />Page design &copy; <span id="copyright-year">{year}</span> SteveZMT'
+			}
+		};
+		function _t(id, html) {
+			var el = document.getElementById(id);
+			if (!el) {
+				return;
+			}
+			if (html) {
+				el.innerHTML = html;
+			} else {
+				/* no-op */
 			}
 		}
-	})();
+		function _txt(id, text) {
+			var el = document.getElementById(id);
+			if (el) {
+				el.textContent = text;
+			}
+		}
+		function applyLang(lang) {
+			var s = STRINGS[lang] || STRINGS.zh;
+			var yr = document.getElementById("copyright-year");
+			var year = yr ? yr.textContent || yr.innerText || "2026" : "2026";
+			_txt("navTitle", s.navTitle);
+			_txt("langSwitchBtn", s.btnSwitch);
+			_txt("heroTitle", s.heroTitle);
+			_txt("heroDesc", s.heroDesc);
+			_txt("errorHeader", s.errorHeader);
+			_txt("pathPrefix", s.pathPrefix);
+			_txt("pathSuffix", s.pathSuffix);
+			_txt("extraNote", s.extraNote);
+			_txt("btnHome", s.btnHome);
+			_txt("btnReport", s.btnReport);
+			_txt("tipsHeader", s.tipsHeader);
+			_t("tipsList", s.tipsList);
+			_t("pageFooter", s.footer.replace("{year}", year));
+
+			/* keep html lang attr in sync */
+			if (document.documentElement) {
+				document.documentElement.lang = lang === "en" ? "en" : "zh-CN";
+			}
+		}
+		function toggleLanguage() {
+			var cur = "zh";
+			try {
+				cur = localStorage.getItem("lang") || "zh";
+			} catch (e) { }
+			var next = cur === "zh" ? "en" : "zh";
+			try {
+				localStorage.setItem("lang", next);
+			} catch (e) { }
+			applyLang(next);
+		}
+
+		/* Init: read saved preference, fall back to browser locale */
+		(function () {
+			var saved = null;
+			try {
+				saved = localStorage.getItem("lang");
+			} catch (e) { }
+			if (!saved) {
+				var nav = navigator.language || navigator.userLanguage || "";
+				saved = nav.toLowerCase().indexOf("en") === 0 ? "en" : "zh";
+			}
+			applyLang(saved);
+		})();
+
 	</script>
 </body>
+
 </html>

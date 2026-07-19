@@ -3,8 +3,8 @@
 定期从多个权威来源收集CA根证书，并将它们保存在标准格式中。通过GitHub Actions自动化运行，每年更新一次，确保证书库保持更新。访问 [ca-update.stevezmt.top](https://ca-update.stevezmt.top) 查看并下载CA证书。
 
 > [!CAUTION]
-> 该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br>
-> 导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br>
+> 该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。  
+> 导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。  
 
 ## 功能
 
@@ -12,6 +12,7 @@
   - Ubuntu ca-certificates
   - Firefox的PEM证书链
   - Microsoft Windows证书更新
+    （已停用，scripts\sync_certificates.py:1661）
   - python-certifi库
 
 - 自动处理已撤销的证书
@@ -51,6 +52,7 @@
    
    # 运行测试
    python scripts/cacert-cli.py test
+
    
    # 同步证书
    python scripts/cacert-cli.py sync
@@ -75,6 +77,7 @@
 - 现代浏览器 (Chrome, Firefox, Edge, Safari)
 - 旧版浏览器 (IE5/6, Netscape)
 - 文本浏览器 (w3m, lynx)
+
 
 
 

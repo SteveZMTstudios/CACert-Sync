@@ -1,15 +1,18 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
 <html>
+
 <head>
   <title>可信CA证书库</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" type="text/css" href="templates/assets/ios6-settings.css">
 </head>
+
 <body class="pinstripe no-js">
   <div class="page-wrap">
     <div class="ios-nav-bar">
-      <div class="ios-nav-title">可信CA证书库</div>
+      <div class="ios-nav-title" id="pageNavTitle">可信CA证书库</div>
+      <button type="button" class="ios-nav-btn-right" id="langSwitchBtn" onclick="toggleLanguage()">English</button>
     </div>
 
     <div class="page-content">
@@ -18,72 +21,84 @@
           <img src="templates/assets/certificate.png" alt="证书" class="hero-icon" width="64" height="64">
         </div>
         <div class="hero-right">
-          <h1>证书管理</h1>
-          <p>此处收集来自 Debian Repo 和 Windows Update 的根证书颁发机构证书，可用于旧式浏览器和系统证书库更新。</p>
-          <p>证书库每年从多个上游刷新，请在 <a href="https://github.com/stevezmtstudios/CACert-Sync" target="_blank">GitHub 仓库</a> 上给我们星标。</p>
+          <h1 id="heroTitle">证书管理</h1>
+          <p id="heroDesc1">此处收集来自 Debian Repo 和 Mozilla PEM 证书链的根证书颁发机构证书，可用于旧式浏览器和系统证书库更新。</p>
+          <p id="heroDesc2">证书库每年从多个上游刷新，请在 <a href="https://github.com/stevezmtstudios/CACert-Sync" target="_blank"
+              id="heroGithubLink">GitHub 仓库</a>
+            上给我们星标。</p>
         </div>
       </div>
 
-      <div class="ios-group-header">状态</div>
+      <div class="ios-group-header" id="statusHeader">状态</div>
       <div class="ios-group rounded">
         <div class="ios-cell info-cell">
-          <span class="ios-cell-icon"><img src="templates/assets/timedate@32x32.png" alt="更新信息" width="22" height="22"></span>
-          <span class="ios-cell-main">最后更新日期：{{LAST_UPDATED}}</span><br />
-          <span class="ios-cell-main">当前包含 {{CERTIFICATE_COUNT}} 个证书</span>
+          <span class="ios-cell-icon"><img src="templates/assets/timedate@32x32.png" alt="更新信息" width="22"
+              height="22"></span>
+          <span class="ios-cell-main" id="lastUpdatedCell">最后更新日期：{{LAST_UPDATED}}</span><br />
+          <span class="ios-cell-main" id="certCountCell">当前包含 {{CERTIFICATE_COUNT}} 个证书</span>
         </div>
       </div>
 
       <noscript>
         <div class="ios-group-header">提示</div>
         <div class="ios-group rounded">
-          <div class="ios-cell warning-cell">该页面的搜索和证书链检测功能需要启用 JavaScript。若浏览器过旧或禁用了 JavaScript，建议使用桌面环境的 openssl 进行证书链检查。</div>
+          <div class="ios-cell warning-cell">该页面的搜索和证书链检测功能需要启用 JavaScript。若浏览器过旧或禁用了 JavaScript，建议使用桌面环境的 openssl
+            进行证书链检查。</div>
         </div>
       </noscript>
 
-      <div class="ios-group-header">证书聚合下载</div>
+      <div class="ios-group-header" id="downloadHeader">证书聚合下载</div>
       <div class="ios-group rounded">
         <div class="ios-cell">
-          <span class="ios-cell-main">聚合证书包：</span>
-          <a href="certs/all/cacerts.pem" class="download-link"><button type="button" class="ios-btn">下载 PEM</button></a>
-          <a href="certs/all/cacerts.crt" class="download-link"><button type="button" class="ios-btn">下载 CRT</button></a>
-          <a href="certs/all/cacerts.p12" class="download-link"><button type="button" class="ios-btn">下载 P12</button></a>
-          <a href="certs/all/cacert.der" class="download-link"><button type="button" class="ios-btn">下载 DER</button></a>
+          <span class="ios-cell-main" id="packLabel">聚合证书包：</span>
+          <a href="certs/all/cacerts.pem" class="download-link"><button type="button" class="ios-btn"
+              id="btnDownloadPem">下载 PEM</button></a>
+          <a href="certs/all/cacerts.crt" class="download-link"><button type="button" class="ios-btn"
+              id="btnDownloadCrt">下载 CRT</button></a>
+          <a href="certs/all/cacerts.p12" class="download-link"><button type="button" class="ios-btn"
+              id="btnDownloadP12">下载 P12</button></a>
+          <a href="certs/all/cacert.der" class="download-link"><button type="button" class="ios-btn"
+              id="btnDownloadDer">下载 DER</button></a>
         </div>
         <div class="ios-cell">
-          <span class="ios-cell-main">Windows 受信任根列表：</span>
-          <a href="https://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab" class="download-link"><button type="button" class="ios-btn">下载 authrootstl.cab</button></a>
+          <span class="ios-cell-main" id="winLabel">Windows 受信任根列表：</span>
+          <a href="https://ctldl.windowsupdate.com/msdownload/update/v3/static/trustedr/en/authrootstl.cab"
+            class="download-link"><button type="button" class="ios-btn" id="btnDownloadWin">下载
+              authrootstl.cab</button></a>
         </div>
         <div class="ios-cell">
-          <span class="ios-cell-main">Mozilla 受信任根列表：</span>
-          <a href="https://curl.se/ca/cacert.pem" class="download-link"><button type="button" class="ios-btn">下载 Mozilla CA 证书（PEM）</button></a>
+          <span class="ios-cell-main" id="mozLabel">Mozilla 受信任根列表：</span>
+          <a href="https://curl.se/ca/cacert.pem" class="download-link"><button type="button" class="ios-btn"
+              id="btnDownloadMoz">下载 Mozilla CA 证书（PEM）</button></a>
         </div>
       </div>
 
-      <div class="ios-group-header">证书链检测</div>
+      <div class="ios-group-header" id="chainHeader">证书链检测</div>
       <div class="ios-group rounded">
         <div class="ios-cell control-cell">
           <input type="text" id="urlInput" class="ios-input" placeholder="例如: https://example.com">
-          <button type="button" class="ios-btn-blue" onclick="checkCertChain()">检测</button>
-          <button type="button" class="ios-btn" onclick="resetTable()">重置</button>
+          <button type="button" class="ios-btn-blue" onclick="checkCertChain()" id="btnCheckChain">检测</button>
+          <button type="button" class="ios-btn" onclick="resetTable()" id="btnResetChain">重置</button>
         </div>
         <div class="ios-cell" id="chainResults" style="display:none;"></div>
       </div>
 
-      <div class="ios-group-header">搜索证书</div>
+      <div class="ios-group-header" id="searchHeader">搜索证书</div>
       <div class="ios-group rounded">
         <div class="ios-cell control-cell">
-          <input type="text" id="searchInput" class="ios-input search-input-full" placeholder="搜索证书名称、颁发者、有效期..." onkeyup="searchTable()">
+          <input type="text" id="searchInput" class="ios-input search-input-full" placeholder="搜索证书名称、颁发者、有效期..."
+            onkeyup="searchTable()">
         </div>
       </div>
 
-      <div class="ios-group-header">可下载证书列表</div>
+      <div class="ios-group-header" id="listHeader">可下载证书</div>
       <div class="ios-group rounded">
         <div class="ios-list-container" id="certList">
           {{CERTIFICATE_LIST_REPLACED}}
         </div>
       </div>
 
-      <div class="ios-footer rounded">
+      <div class="ios-footer rounded" id="pageFooter">
         该项目仅收集和存储来自网络上公开的CA证书，不对其即时性和真实性做出保证。<br>
         导入未知来源的CA证书可能会使您的设备陷入风险，包括但不限于网络流量被监视等。<br>
         页面设计版权所有 &copy; <span id="copyright-year">2026</span> SteveZMT
@@ -93,5 +108,7 @@
 
   <script type="text/javascript" src="templates/assets/ios6-legacy-polyfills.js"></script>
   <script type="text/javascript" src="templates/assets/ios6-settings.js"></script>
+  <script type="text/javascript" src="templates/assets/ios6-lang.js"></script>
 </body>
+
 </html>

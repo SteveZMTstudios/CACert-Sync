@@ -5,6 +5,16 @@ body {
   font-size: 13px;
   color: #1f1f1f;
   background: #d0d5df;
+  background: -webkit-repeating-linear-gradient(left,
+      #d0d5df 0px,
+      #d0d5df 3px,
+      #d5dae3 3px,
+      #d5dae3 10px);
+  background: -moz-repeating-linear-gradient(left,
+      #d0d5df 0px,
+      #d0d5df 3px,
+      #d5dae3 3px,
+      #d5dae3 10px);
   background: repeating-linear-gradient(to right,
       #d0d5df 0px,
       #d0d5df 3px,
@@ -17,9 +27,9 @@ a {
   text-decoration: none;
 }
 
-a:hover {
+/* a:hover {
   text-decoration: underline;
-}
+} */
 
 .rounded {
   border-radius: 9px;
@@ -32,15 +42,57 @@ a:hover {
 }
 
 .ios-nav-bar {
+  position: relative;
   height: 44px;
   border-bottom: 1px solid #4a5c73;
   background: #708cae;
   background: -webkit-linear-gradient(top, #97a9c2 0%, #859cba 48%, #708cae 52%, #5e799c 100%);
   background: -moz-linear-gradient(top, #97a9c2 0%, #859cba 48%, #708cae 52%, #5e799c 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#97a9c2), color-stop(48%, #859cba), color-stop(52%, #708cae), to(#5e799c));
   background: linear-gradient(to bottom, #97a9c2 0%, #859cba 48%, #708cae 52%, #5e799c 100%);
   text-align: center;
   color: #ffffff;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+.ios-nav-btn-right {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  height: 29px;
+  line-height: 27px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #ffffff !important;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
+  border: 1px solid #3b4e65;
+  border-radius: 4px;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  background: #5c7595;
+  background: -webkit-linear-gradient(top, #7b94b5 0%, #60799a 50%, #516b8d 50%, #40597a 100%);
+  background: -moz-linear-gradient(top, #7b94b5 0%, #60799a 50%, #516b8d 50%, #40597a 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#7b94b5), color-stop(50%, #60799a), color-stop(50%, #516b8d), to(#40597a));
+  background: linear-gradient(to bottom, #7b94b5 0%, #60799a 50%, #516b8d 50%, #40597a 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  outline: none;
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
+}
+
+.ios-nav-btn-right:active {
+  background: -webkit-linear-gradient(top, #4b5e77 0%, #3a4d65 50%, #2e4057 50%, #203147 100%);
+  background: -moz-linear-gradient(top, #4b5e77 0%, #3a4d65 50%, #2e4057 50%, #203147 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#4b5e77), color-stop(50%, #3a4d65), color-stop(50%, #2e4057), to(#203147));
+  background: linear-gradient(to bottom, #4b5e77 0%, #3a4d65 50%, #2e4057 50%, #203147 100%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  -webkit-box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  -moz-box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .ios-nav-title {
@@ -145,6 +197,7 @@ a:hover {
   background: #abb5c7;
   background: -webkit-linear-gradient(top, #d1d7e2 0%, #abb5c7 100%);
   background: -moz-linear-gradient(top, #d1d7e2 0%, #abb5c7 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#d1d7e2), to(#abb5c7));
   background: linear-gradient(to bottom, #d1d7e2 0%, #abb5c7 100%);
   border-top: 1px solid #9da7b6;
   border-bottom: 1px solid #717d90;
@@ -153,7 +206,9 @@ a:hover {
 }
 
 .ios-input {
-  box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
   width: 60%;
   max-width: 560px;
   margin: 0;
@@ -163,10 +218,16 @@ a:hover {
   -webkit-border-radius: 14px;
   -moz-border-radius: 14px;
   background: #ffffff url('search@32x32.png') no-repeat 8px center;
-  background-size: 14px 14px;
+  -webkit-background-size: 14px 14px;
+     -moz-background-size: 14px 14px;
+          background-size: 14px 14px;
   font-family: inherit;
   font-size: 13px;
   vertical-align: middle;
+
+  box-shadow: inset 0 2px 2px #8a8a8a;
+  -webkit-box-shadow: inset 0 2px 2px #8a8a8a;
+  -moz-box-shadow: inset 0 2px 2px #8a8a8a;
 }
 
 .control-cell .search-input-full {
@@ -185,6 +246,7 @@ a:hover {
   background: #627b9b;
   background: -webkit-linear-gradient(top, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
   background: -moz-linear-gradient(top, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#8ca2be), color-stop(48%, #6d88ab), color-stop(52%, #577397), to(#496386));
   background: linear-gradient(to bottom, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
   color: #ffffff !important;
   font-family: inherit;
@@ -198,17 +260,73 @@ a:hover {
   vertical-align: middle;
 }
 
+
+.ios-btn:hover,
+.ios-icon-btn:hover,
+.download-button:hover,
+.cert-card-btn:hover {
+  /* 在原有渐变之上叠加一层半透明白色，使整体变亮 */
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    -webkit-linear-gradient(top, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
+  background: -moz-linear-gradient(top, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    -moz-linear-gradient(top, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(rgba(255, 255, 255, 0.2)), to(rgba(255, 255, 255, 0.2))),
+    -webkit-gradient(linear, left top, left bottom, from(#8ca2be), color-stop(48%, #6d88ab), color-stop(52%, #577397), to(#496386));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    linear-gradient(to bottom, #8ca2be 0%, #6d88ab 48%, #577397 52%, #496386 100%);
+
+  /* 可选：略微提升内阴影高光，增强亮感（非必须） */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+  -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+  -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
 .ios-btn:active,
 .ios-icon-btn:active,
-.download-button:active,
 .cert-card-btn:active {
   background: #496386;
   background: -webkit-linear-gradient(top, #526f96 0%, #415a7b 100%);
   background: -moz-linear-gradient(top, #526f96 0%, #415a7b 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#526f96), to(#415a7b));
   background: linear-gradient(to bottom, #526f96 0%, #415a7b 100%);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
   -webkit-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
   -moz-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  padding: 6px 8px 4px 10px;
+  /* 上+1，左+1，下-1，右-1（具体视原padding而定） */
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
+  /* 确保 padding 不会撑大元素 */
+
+}
+
+/* 去除点击/触摸时的蓝色遮罩（适用所有按钮类和链接类） */
+.ios-btn,
+.ios-icon-btn,
+.download-button,
+.cert-card-btn,
+.ios-btn:active,
+.ios-icon-btn:active,
+.download-button:active,
+.cert-card-btn:active,
+.ios-btn:focus,
+.ios-icon-btn:focus,
+.download-button:focus,
+.cert-card-btn:focus {
+  /* 移动端（iOS/Android）点击高亮遮罩 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+  /* 旧版兼容 */
+
+  /* 桌面浏览器焦点时的蓝色外边框 */
+  outline: none;
+
+  /* 火狐浏览器按钮内部虚线（可选） */
+  &::-moz-focus-inner {
+    border: 0;
+  }
 }
 
 /* Blue confirmation button */
@@ -220,6 +338,7 @@ a:hover {
   background: #3060a1;
   background: -webkit-linear-gradient(top, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
   background: -moz-linear-gradient(top, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#5b89ce), color-stop(48%, #3a68ad), color-stop(52%, #215197), to(#184381));
   background: linear-gradient(to bottom, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
   color: #ffffff !important;
   font-family: inherit;
@@ -235,14 +354,33 @@ a:hover {
   padding: 5px 9px;
 }
 
+.ios-btn-blue:hover {
+  background: -webkit-linear-gradient(top, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    -webkit-linear-gradient(top, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
+  background: -moz-linear-gradient(top, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    -moz-linear-gradient(top, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(rgba(255, 255, 255, 0.2)), to(rgba(255, 255, 255, 0.2))),
+    -webkit-gradient(linear, left top, left bottom, from(#5b89ce), color-stop(48%, #3a68ad), color-stop(52%, #215197), to(#184381));
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.2)),
+    linear-gradient(to bottom, #5b89ce 0%, #3a68ad 48%, #215197 52%, #184381 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+  -webkit-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+  -moz-box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
 .ios-btn-blue:active {
   background: #184381;
   background: -webkit-linear-gradient(top, #215197 0%, #15386b 100%);
   background: -moz-linear-gradient(top, #215197 0%, #15386b 100%);
+  background: -webkit-gradient(linear, left top, left bottom, from(#215197), to(#15386b));
   background: linear-gradient(to bottom, #215197 0%, #15386b 100%);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
   -webkit-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
   -moz-box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  padding: 6px 8px 4px 10px;
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
 }
 
 .ios-btn,
@@ -315,8 +453,6 @@ a:hover {
   border: 1px dashed #999999;
   -webkit-border-radius: 9px;
   -moz-border-radius: 9px;
-  -ms-border-radius: 9px;
-  -o-border-radius: 9px;
   border-radius: 9px;
   background-color: rgba(255, 255, 255, 0.5);
   margin: 15px 9px 24px 9px;
@@ -452,7 +588,7 @@ body.pinstripe {
   background-image: -moz-linear-gradient(top, #058cdf 0%, #015de6 100%) !important;
   background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%, #058cdf), color-stop(100%, #015de6)) !important;
   background-image: -webkit-linear-gradient(top, #058cdf 0%, #015de6 100%) !important;
-  background-image: -ms-linear-gradient(top, #058cdf 0%, #015de6 100%) !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, from(#058cdf), to(#015de6)) !important;
   background-image: linear-gradient(to bottom, #058cdf 0%, #015de6 100%) !important;
   color: #ffffff !important;
 }
@@ -520,10 +656,15 @@ body.pinstripe {
   width: 10px;
   height: 13px;
   background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAANCAYAAACQN/8FAAAAUElEQVQoz2NggIKysrI6EGbAB6CK/kNxHT6FLUgKQbiaaorb0RRXUK4YKCENxG+RFD4BYiFsim6jKVKhnSIWID6CVxGSYhWoAtyK0BTjVAQA7b9/uRuNojcAAAAASUVORK5CYII=');
-  background-size: 10px 13px;
+  -webkit-background-size: 10px 13px;
+     -moz-background-size: 10px 13px;
+          background-size: 10px 13px;
   background-repeat: no-repeat;
   background-position: center;
+  transition: -webkit-transform 0.2s ease-in-out;
+  -moz-transition: transform 0.2s ease-in-out, -moz-transform 0.2s ease-in-out;
   transition: transform 0.2s ease-in-out;
+  transition: transform 0.2s ease-in-out, -webkit-transform 0.2s ease-in-out, -moz-transform 0.2s ease-in-out;
   -webkit-transition: -webkit-transform 0.2s ease-in-out;
   -moz-transition: -moz-transform 0.2s ease-in-out;
   -o-transition: -o-transform 0.2s ease-in-out;
@@ -601,24 +742,42 @@ body.pinstripe {
   margin: 8px 0;
   font-size: 13px;
   font-weight: bold;
-  color: #3e8e41;
+  /* color: #3e8e41; */
   /* Green color */
+  color: #52c41a;
 }
 
 .trusted-icon {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  line-height: 16px;
+  vertical-align: text-top;
+  width: 13px;
+  height: 13px;
+  line-height: 13px;
   text-align: center;
-  border: 1px solid #3e8e41;
-  background-color: #3e8e41;
+  font-size: 10px;
+  font-weight: 1000;
+  /* border: 1px solid #3e8e41; */
+  /* background-color: #3e8e41; */
+  background: -webkit-gradient(linear, left top, left bottom, from(#53de56), to(#007c00));
+  background: -webkit-linear-gradient(top, #53de56, #007c00);
+  background: -moz-linear-gradient(top, #53de56, #007c00);
+  background: linear-gradient(to bottom, #53de56, #007c00);
   color: #fff;
   border-radius: 50%;
   -webkit-border-radius: 50%;
   -moz-border-radius: 50%;
-  /* margin-right: 4px; */
-  font-size: 11px;
+  margin-right: 2px;
+}
+
+.trusted-text {
+  background: -webkit-gradient(linear, left top, left bottom, from(#3a8b3a), to(#64af64));
+  background: -webkit-linear-gradient(top, #3a8b3a, #64af64);
+  background: -moz-linear-gradient(top, #3a8b3a, #64af64);
+  background: linear-gradient(to bottom, #3a8b3a, #64af64);
+  /* 将背景颜色限制在文字轮廓内 */
+  -webkit-background-clip: text;
+  /* 将文字纯色设为透明，使其显示背景的渐变色 */
+  -webkit-text-fill-color: transparent;
 }
 
 /* App Store style download/install button layout override */
@@ -627,6 +786,14 @@ body.pinstripe {
   width: 80px;
   padding: 2px 5px;
   text-align: center;
+}
+
+.cert-card-btn:active {
+  padding: 3px 4px 1px 6px !important;
+  -webkit-box-sizing: border-box;
+     -moz-box-sizing: border-box;
+          box-sizing: border-box;
+  /* 文字变灰，可按需调整 */
 }
 
 /* Row 2: Metadata list */
@@ -787,4 +954,40 @@ body.pinstripe {
   -webkit-border-bottom-right-radius: 8px !important;
   -moz-border-radius-bottomleft: 8px !important;
   -moz-border-radius-bottomright: 8px !important;
+}
+
+/* Style for "More Details" Toggle Button & Collapsible details */
+.cert-more-toggle {
+  display: block;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cert-more-toggle-row {
+  border-top: 1px solid #e0e0e0;
+  margin-top: 12px !important;
+  padding: 10px 14px 10px 0 !important;
+  min-height: auto !important;
+  height: 38px !important;
+  -webkit-box-sizing: border-box !important;
+     -moz-box-sizing: border-box !important;
+          box-sizing: border-box !important;
+  position: relative !important;
+}
+
+.more-toggle-title {
+  color: #586c90 !important;
+  font-weight: bold !important;
+  text-shadow: 0 1px 0 #ffffff;
+}
+
+.cert-more-details-content {
+  border-top: 1px dashed #e0e0e0;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.more-toggle-arrow {
+  margin-top: -6.5px !important;
 }

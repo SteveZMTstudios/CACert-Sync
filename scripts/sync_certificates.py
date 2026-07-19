@@ -944,32 +944,14 @@ def get_cert_info(cert_path: Path, verbose: bool = True) -> Dict:
     """获取证书信息"""
     logger.debug(f"获取证书信息: {cert_path.name}")
     try:
-        # 使用openssl获取证书信息
+        # 使用openssl获取证书信息（包含-text以获取完整细节）
         output = run_command([
             "openssl", "x509", "-in", cert_path.as_posix(),
-            "-noout", "-subject", "-issuer", "-dates", "-fingerprint"
+            "-noout", "-text", "-fingerprint"
         ], verbose=verbose)
         
         info = {}
         
-        def extract_field(part: str, field: str) -> str:
-            """提取字段值，处理带空格和不带空格的格式，并处理引号问题"""
-            # 处理常见的格式变体
-            patterns = [
-                f"{field}=",      # CN=Value
-                f"{field} =",     # CN =Value
-                f"{field}= ",     # CN= Value
-                f"{field} = "     # CN = Value
-            ]
-            for pattern in patterns:
-                if pattern in part:
-                    value = part.split(pattern)[1].strip()
-                    # 移除引号 (如果存在)
-                    if value.startswith('"') and value.endswith('"'):
-                        value = value[1:-1]
-                    return value
-            return ""
-
         # 智能解析带引号的字段
         def parse_dn_string(dn_string: str) -> Dict[str, str]:
             """解析带引号的DN字符串，返回字段映射"""
@@ -993,54 +975,158 @@ def get_cert_info(cert_path: Path, verbose: bool = True) -> Dict:
             if current_part:
                 field_parts.append(current_part.strip())
             
+            # 辅助提取
+            def extract_field_from_part(part: str, field: str) -> str:
+                patterns = [
+                    f"{field}=",
+                    f"{field} =",
+                    f"{field}= ",
+                    f"{field} = "
+                ]
+                for pattern in patterns:
+                    if pattern in part:
+                        val = part.split(pattern)[1].strip()
+                        if val.startswith('"') and val.endswith('"'):
+                            val = val[1:-1]
+                        return val
+                return ""
+            
             # 解析每个部分
             for part in field_parts:
                 for field in ["CN", "O"]:
-                    value = extract_field(part, field)
+                    value = extract_field_from_part(part, field)
                     if value:
                         result[field] = value
             
             return result
 
-        # 解析主题
-        if "subject=" in output:
-            subject_line = next((l for l in output.split("\n") if l.startswith("subject=")), "")
-            # 去除subject=前缀
-            subject_content = subject_line.replace("subject=", "").strip()
+        # 解析主题 (Subject)
+        subject_line = ""
+        for line in output.split("\n"):
+            line_strip = line.strip()
+            if line_strip.startswith("Subject:") or line_strip.startswith("subject="):
+                subject_line = line_strip
+                break
+        
+        if subject_line:
+            if subject_line.startswith("Subject:"):
+                subject_content = subject_line[len("Subject:"):].strip()
+            else:
+                subject_content = subject_line[len("subject="):].strip()
             
-            # 使用智能解析处理带引号的内容
+            info["full_subject"] = subject_content
             fields = parse_dn_string(subject_content)
-            
             if "CN" in fields:
                 info["subject_cn"] = fields["CN"]
             if "O" in fields:
                 info["subject_o"] = fields["O"]
         
-        # 解析颁发者
-        if "issuer=" in output:
-            issuer_line = next((l for l in output.split("\n") if l.startswith("issuer=")), "")
-            # 去除issuer=前缀
-            issuer_content = issuer_line.replace("issuer=", "").strip()
+        # 解析颁发者 (Issuer)
+        issuer_line = ""
+        for line in output.split("\n"):
+            line_strip = line.strip()
+            if line_strip.startswith("Issuer:") or line_strip.startswith("issuer="):
+                issuer_line = line_strip
+                break
+                
+        if issuer_line:
+            if issuer_line.startswith("Issuer:"):
+                issuer_content = issuer_line[len("Issuer:"):].strip()
+            else:
+                issuer_content = issuer_line[len("issuer="):].strip()
             
-            # 使用智能解析处理带引号的内容
+            info["full_issuer"] = issuer_content
             fields = parse_dn_string(issuer_content)
-            
             if "CN" in fields:
                 info["issuer_cn"] = fields["CN"]
             if "O" in fields:
                 info["issuer_o"] = fields["O"]
         
-        if "notBefore=" in output:
-            not_before_line = next((l for l in output.split("\n") if l.startswith("notBefore=")), "")
-            info["not_before"] = not_before_line.replace("notBefore=", "").strip()
+        # 解析有效期
+        not_before_line = ""
+        for line in output.split("\n"):
+            line_strip = line.strip()
+            if line_strip.startswith("Not Before:") or line_strip.startswith("notBefore="):
+                not_before_line = line_strip
+                break
+        if not_before_line:
+            if not_before_line.startswith("Not Before:"):
+                info["not_before"] = not_before_line[len("Not Before:"):].strip()
+            else:
+                info["not_before"] = not_before_line[len("notBefore="):].strip()
+
+        not_after_line = ""
+        for line in output.split("\n"):
+            line_strip = line.strip()
+            if line_strip.startswith("Not After") or line_strip.startswith("notAfter="):
+                if ":" in line_strip:
+                    not_after_line = line_strip
+                    break
+        if not_after_line:
+            if not_after_line.startswith("notAfter="):
+                info["not_after"] = not_after_line[len("notAfter="):].strip()
+            else:
+                info["not_after"] = not_after_line.split(":", 1)[1].strip()
+
+        # 解析版本
+        version_match = re.search(r"Version:\s*([^\n\r]+)", output, re.IGNORECASE)
+        if version_match:
+            info["version"] = version_match.group(1).strip()
+        else:
+            info["version"] = "3"
+
+        # 解析序列号
+        serial_match = re.search(r"Serial Number:\s*\n?\s*(.*?)(?:\n\s*Signature Algorithm:|$)", output, re.DOTALL | re.IGNORECASE)
+        if serial_match:
+            serial_str = serial_match.group(1).strip()
+            # 拼接多行序列号
+            serial_str = " ".join([part.strip() for part in serial_str.split("\n") if part.strip()])
+            info["serial_number"] = serial_str
+        else:
+            info["serial_number"] = "未知"
+
+        # 解析签名算法
+        sig_alg_match = re.search(r"Signature Algorithm:\s*([^\s\n\r]+)", output, re.IGNORECASE)
+        if sig_alg_match:
+            info["signature_algorithm"] = sig_alg_match.group(1).strip()
+        else:
+            info["signature_algorithm"] = "未知"
+
+        # 解析公钥算法和大小
+        pub_key_alg_match = re.search(r"Public Key Algorithm:\s*([^\n\r]+)", output, re.IGNORECASE)
+        if pub_key_alg_match:
+            info["public_key_algorithm"] = pub_key_alg_match.group(1).strip()
+        else:
+            info["public_key_algorithm"] = "未知"
+            
+        pub_key_size_match = re.search(r"Public-Key:\s*([^\n\r]+)", output, re.IGNORECASE)
+        if pub_key_size_match:
+            info["public_key_size"] = pub_key_size_match.group(1).strip()
+        else:
+            info["public_key_size"] = ""
+
+        # 解析密钥用途
+        key_usage_match = re.search(r"X509v3 Key Usage:\s*(critical)?\s*\n\s*([^\n\r]+)", output, re.IGNORECASE)
+        if key_usage_match:
+            usage_str = key_usage_match.group(2).strip()
+            is_critical = key_usage_match.group(1)
+            info["key_usage"] = f"{usage_str} (critical)" if is_critical else usage_str
+        else:
+            info["key_usage"] = "无"
+
+        # 解析基本约束
+        basic_constraints_match = re.search(r"X509v3 Basic Constraints:\s*(critical)?\s*\n\s*([^\n\r]+)", output, re.IGNORECASE)
+        if basic_constraints_match:
+            bc_str = basic_constraints_match.group(2).strip()
+            is_critical = basic_constraints_match.group(1)
+            info["basic_constraints"] = f"{bc_str} (critical)" if is_critical else bc_str
+        else:
+            info["basic_constraints"] = "无"
         
-        if "notAfter=" in output:
-            not_after_line = next((l for l in output.split("\n") if l.startswith("notAfter=")), "")
-            info["not_after"] = not_after_line.replace("notAfter=", "").strip()
-        
-        if "SHA1 Fingerprint=" in output:
-            fingerprint_line = next((l for l in output.split("\n") if "SHA1 Fingerprint=" in l), "")
-            info["fingerprint"] = fingerprint_line.split("=")[1].strip().replace(":", "").lower()
+        # 解析SHA-1指纹
+        sha1_line = next((l for l in output.split("\n") if "fingerprint=" in l.lower() and ("sha1" in l.lower() or "sha-1" in l.lower() or (":" in l and "sha256" not in l.lower() and "md5" not in l.lower()))), "")
+        if sha1_line:
+            info["fingerprint"] = sha1_line.split("=")[1].strip().replace(":", "").lower()
             info["fingerprint_type"] = "sha1"
             
         # 尝试获取SHA-256指纹
@@ -1050,12 +1136,11 @@ def get_cert_info(cert_path: Path, verbose: bool = True) -> Dict:
                 "-noout", "-fingerprint", "-sha256"
             ], verbose=False)
             
-            if "SHA256 Fingerprint=" in sha256_output:
-                sha256_line = next((l for l in sha256_output.split("\n") if "SHA256 Fingerprint=" in l), "")
+            if "fingerprint=" in sha256_output.lower():
+                sha256_line = next((l for l in sha256_output.split("\n") if "fingerprint=" in l.lower()), "")
                 info["sha256_fingerprint"] = sha256_line.split("=")[1].strip().replace(":", "").lower()
         except Exception as e:
             logger.debug(f"获取SHA-256指纹时出错: {e}")
-            # 如果SHA-256获取失败，继续使用SHA-1
         
         # 尝试获取MD5指纹
         try:
@@ -1064,8 +1149,8 @@ def get_cert_info(cert_path: Path, verbose: bool = True) -> Dict:
                 "-noout", "-fingerprint", "-md5"
             ], verbose=False)
             
-            if "MD5 Fingerprint=" in md5_output:
-                md5_line = next((l for l in md5_output.split("\n") if "MD5 Fingerprint=" in l), "")
+            if "fingerprint=" in md5_output.lower():
+                md5_line = next((l for l in md5_output.split("\n") if "fingerprint=" in l.lower()), "")
                 info["md5_fingerprint"] = md5_line.split("=")[1].strip().replace(":", "").lower()
         except Exception as e:
             logger.debug(f"获取MD5指纹时出错: {e}")
@@ -1368,11 +1453,41 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
     # 按证书名称排序（使用证书名称的小写形式进行排序）
     sorted_certs.sort(key=lambda x: x[1].lower())
     
+    def format_fingerprint(fp: str) -> str:
+        if not fp or fp == "未知":
+            return "未知"
+        clean = fp.replace(":", "").strip()
+        return ":".join(clean[i:i+2] for i in range(0, len(clean), 2)).upper()
+
     # 生成HTML
     for idx, (cert_name, cert_display_name, issuer, valid_until) in enumerate(sorted_certs):
         cert_id = f"cert_{idx}"
+        info = cert_info_map.get(cert_name, {})
+        version = info.get("version", "3")
+        serial_number = info.get("serial_number", "未知")
+        signature_algorithm = info.get("signature_algorithm", "未知")
+        full_issuer = info.get("full_issuer", issuer)
+        not_before = info.get("not_before", "未知")
+        not_after = info.get("not_after", valid_until)
+        full_subject = info.get("full_subject", cert_display_name)
+        public_key_algorithm = info.get("public_key_algorithm", "未知")
+        public_key_size = info.get("public_key_size", "")
+        key_usage = info.get("key_usage", "无")
+        basic_constraints = info.get("basic_constraints", "无")
+        
+        sha1_fingerprint = format_fingerprint(info.get("fingerprint", ""))
+        sha256_fingerprint = format_fingerprint(info.get("sha256_fingerprint", ""))
+        md5_fingerprint = format_fingerprint(info.get("md5_fingerprint", ""))
+        
+        sha1_clean = sha1_fingerprint.replace(":", "")
+        sha256_clean = sha256_fingerprint.replace(":", "")
+        md5_clean = md5_fingerprint.replace(":", "")
+        
+        pubkey_str = f"{public_key_algorithm} {public_key_size}".strip()
+        search_extra = f"{serial_number} {sha1_fingerprint} {sha1_clean} {sha256_fingerprint} {sha256_clean} {md5_fingerprint} {md5_clean} {full_subject} {full_issuer} {pubkey_str} {key_usage} {basic_constraints} {signature_algorithm} v{version} version {version}"
+
         cert_list_html.append(f"""
-        <div class="ios-list-item-container" id="container_{cert_id}" data-name="{cert_display_name}" data-issuer="{issuer}" data-valid="{valid_until}">
+        <div class="ios-list-item-container" id="container_{cert_id}" data-name="{cert_display_name}" data-issuer="{issuer}" data-valid="{valid_until}" data-extra="{search_extra}">
           <a href="certs/{cert_name}.crt" class="ios-list-item-link" onclick="return handleItemClick(event, '{cert_id}')">
             <div class="ios-list-item">
               <img class="ios-list-item-icon" src="assets/settings@96x96.png" width="30" height="30" alt="">
@@ -1412,6 +1527,66 @@ def generate_html_page(cert_info_map: Dict[str, Dict], output_path: Path) -> Non
               <div class="cert-metadata-row">
                 <span class="meta-label">文件名</span>
                 <span class="meta-value">{cert_name}.crt</span>
+              </div>
+              
+              <a href="javascript:void(0)" class="cert-more-toggle" onclick="return handleMoreToggleClick(event, '{cert_id}')" id="more_toggle_link_{cert_id}">
+                <div class="ios-list-item cert-more-toggle-row">
+                  <div class="ios-list-item-text">
+                    <div class="ios-list-item-title more-toggle-title">更多详细信息</div>
+                  </div>
+                  <div class="ios-list-arrow more-toggle-arrow" id="more_arrow_{cert_id}"></div>
+                </div>
+              </a>
+              
+              <div class="cert-more-details-content" id="more_content_{cert_id}" style="display: none;">
+                <div class="cert-metadata-row">
+                  <span class="meta-label">版本</span>
+                  <span class="meta-value">{version}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">序列号</span>
+                  <span class="meta-value">{serial_number}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">签名算法</span>
+                  <span class="meta-value">{signature_algorithm}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">颁发者</span>
+                  <span class="meta-value">{full_issuer}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">有效期</span>
+                  <span class="meta-value">{not_before} - {not_after}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">使用者</span>
+                  <span class="meta-value">{full_subject}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">公钥</span>
+                  <span class="meta-value">{pubkey_str}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">密钥用途</span>
+                  <span class="meta-value">{key_usage}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">基本约束</span>
+                  <span class="meta-value">{basic_constraints}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">SHA-1指纹</span>
+                  <span class="meta-value">{sha1_fingerprint}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">SHA-256指纹</span>
+                  <span class="meta-value">{sha256_fingerprint}</span>
+                </div>
+                <div class="cert-metadata-row">
+                  <span class="meta-label">MD5指纹</span>
+                  <span class="meta-value">{md5_fingerprint}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -1498,10 +1673,10 @@ def main():
     collected_certs.extend(firefox_certs)
     logger.info(f"从Mozilla源收集了 {len(firefox_certs)} 个证书")
     
-    # 从Windows收集
-    windows_certs = collect_windows_certs(verbose=verbose)
-    collected_certs.extend(windows_certs)
-    logger.info(f"从Windows收集了 {len(windows_certs)} 个证书")
+    # # 从Windows收集
+    # windows_certs = collect_windows_certs(verbose=verbose)
+    # collected_certs.extend(windows_certs)
+    # logger.info(f"从Windows收集了 {len(windows_certs)} 个证书")
     
     # 从certifi收集
     certifi_certs = collect_certifi_certs(verbose=verbose)
